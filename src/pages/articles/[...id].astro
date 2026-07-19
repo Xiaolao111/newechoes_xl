@@ -1,4 +1,5 @@
 ---
+export const prerender = true;
 import { getCollection, render } from "astro:content";
 import type { CollectionEntry } from "astro:content";
 import { getSpecialPath } from "@/content.config";
@@ -12,6 +13,7 @@ import Layout from "@/components/Layout.astro";
 import Breadcrumb from "@/components/Breadcrumb.astro";
 import { ARTICLE_EXPIRY_CONFIG } from "@/consts";
 import "@/styles/articles.css";
+
 
 // 定义文章类型
 type ArticleEntry = CollectionEntry<"articles">;

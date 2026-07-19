@@ -1,6 +1,8 @@
 ---
+export const prerender = true;
 import ArticlesPage from './index.astro';
 import { getCollection, type CollectionEntry } from 'astro:content';
+
 
 // 获取目录结构
 export async function getStaticPaths() {

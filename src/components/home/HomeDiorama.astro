@@ -49,8 +49,20 @@ const autoPostsLabel = `${postCount} 篇 · 近 ${years} 年`;
     return p === "/" || p === "";
   };
 
+  let initFrame = 0;
   const maybeInit = () => {
-    if (isHome()) initDiorama();
+    // Swup replaces <main> asynchronously. Wait one frame so the new homepage
+    // canvas exists before binding Three.js controls and pointer handlers.
+    if (initFrame) cancelAnimationFrame(initFrame);
+    initFrame = requestAnimationFrame(() => {
+      initFrame = 0;
+      if (
+        isHome() &&
+        document.querySelector<HTMLCanvasElement>("[data-diorama-canvas]")
+      ) {
+        initDiorama();
+      }
+    });
   };
 
   // Initial page load

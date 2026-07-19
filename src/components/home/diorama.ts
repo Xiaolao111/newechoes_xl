@@ -1371,7 +1371,7 @@ export function initDiorama() {
   const interactives: Interactive[] = [
     { object: notebook, label: "笔记本 · 文章", route: "/articles", basePos: notebook.position.clone() },
     { object: laptop, label: "电脑 · 项目", route: "/projects", basePos: laptop.position.clone() },
-    { object: person, label: "lsy · 关于", route: "/about", basePos: person.position.clone() },
+    { object: person, label: "xiaolao · 关于", route: "/about", basePos: person.position.clone() },
     { object: bookStack, label: "书 · 读书", route: "/books", basePos: bookStack.position.clone() },
     { object: tv, label: "电视 · 观影", route: "/movies", basePos: tv.position.clone() },
   ];

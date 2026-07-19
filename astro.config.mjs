@@ -7,7 +7,7 @@ import react from "@astrojs/react";
 import rehypeExternalLinks from "rehype-external-links";
 import { SITE_URL } from "./src/consts";
 import compressor from "astro-compressor";
-import vercel from "@astrojs/vercel";
+import node from "@astrojs/node";
 import { articleIndexerIntegration } from "./src/plugins/build-article-index.js";
 import { rehypeCodeBlocks } from "./src/plugins/rehype-code-blocks.js";
 import { rehypeTables } from "./src/plugins/rehype-tables.js";
@@ -22,7 +22,7 @@ import { remarkImageCaptions } from "./src/plugins/remark-image-captions.js";
 // https://astro.build/config
 export default defineConfig({
   site: SITE_URL,
-  output: "static",
+  output: "server",
   trailingSlash: "ignore",
 
   build: {
@@ -92,5 +92,5 @@ export default defineConfig({
     gfm: true,
   },
 
-  adapter: vercel(),
+  adapter: node({ mode: "standalone" }),
 });
