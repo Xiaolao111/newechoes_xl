@@ -375,6 +375,7 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
           LineBasicMaterial: ThreeLineBasicMaterial,
           Line: ThreeLine,
           FrontSide: ThreeFrontSide,
+          DoubleSide: ThreeDoubleSide,
         } = three;
 
         // 加载OrbitControls和CSS2DRenderer
@@ -403,6 +404,18 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
         };
 
         const colors = getColors();
+        const visitedPalette = isDarkMode
+          ? ["#fb7185", "#fbbf24", "#a78bfa", "#22d3ee", "#4ade80", "#fb923c"]
+          : ["#f43f5e", "#f59e0b", "#8b5cf6", "#06b6d4", "#22c55e", "#f97316"];
+
+        // 使用地区名称生成稳定的颜色：刷新页面后同一地点仍保持相同配色。
+        const getVisitedColor = (regionName: string) => {
+          let hash = 0;
+          for (const character of regionName) {
+            hash = (hash * 31 + character.charCodeAt(0)) | 0;
+          }
+          return visitedPalette[Math.abs(hash) % visitedPalette.length];
+        };
 
         // 创建场景
         const scene = new ThreeScene();
@@ -536,6 +549,58 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
                 new ThreeVector3(p.x, p.y, p.z),
             );
 
+            if (is_visited && threePoints.length > 3) {
+              // GeoJSON 多边形的最后一个点通常与第一个点重合，三角剖分前移除它。
+              const ringPoints =
+                threePoints[0].distanceToSquared(threePoints[threePoints.length - 1]) <
+                0.000001
+                  ? threePoints.slice(0, -1)
+                  : threePoints;
+
+              if (ringPoints.length > 2) {
+                const normal = ringPoints
+                  .reduce(
+                    (sum: typeof threePoints[number], point: typeof threePoints[number]) =>
+                      sum.add(point),
+                    new ThreeVector3(),
+                  )
+                  .normalize();
+                const referenceAxis =
+                  Math.abs(normal.y) < 0.9
+                    ? new ThreeVector3(0, 1, 0)
+                    : new ThreeVector3(1, 0, 0);
+                const tangent = new ThreeVector3()
+                  .crossVectors(referenceAxis, normal)
+                  .normalize();
+                const bitangent = new ThreeVector3()
+                  .crossVectors(normal, tangent)
+                  .normalize();
+                const shapePoints = ringPoints.map(
+                  (point: typeof threePoints[number]) =>
+                    new ThreeVector2(point.dot(tangent), point.dot(bitangent)),
+                );
+                const triangles = three.ShapeUtils.triangulateShape(shapePoints, []);
+
+                if (triangles.length > 0) {
+                  const fillGeometry = new ThreeBufferGeometry().setFromPoints(
+                    ringPoints.map((point: typeof threePoints[number]) =>
+                      point.clone().normalize().multiplyScalar(2.012),
+                    ),
+                  );
+                  fillGeometry.setIndex(triangles.flat());
+
+                  const fillMaterial = createMaterial(
+                    getVisitedColor(region_name),
+                    ThreeDoubleSide,
+                    isDarkMode ? 0.5 : 0.42,
+                  );
+                  const fill = new ThreeMesh(fillGeometry, fillMaterial);
+                  fill.renderOrder = 2;
+                  regionObject.add(fill);
+                }
+              }
+            }
+
             // 创建边界线
             if (threePoints.length > 1) {
               const lineGeometry = new ThreeBufferGeometry().setFromPoints(
@@ -548,8 +613,7 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
               let borderColor;
 
               if (is_visited) {
-                // 已访问的地区，包括中国城市，都使用绿色边界
-                borderColor = colors.visitedBorder;
+                borderColor = getVisitedColor(region_name);
               } else if (isChina) {
                 // 未访问的中国和中国区域使用红色边界
                 borderColor = colors.chinaBorder;

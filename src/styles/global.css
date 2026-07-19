@@ -1,9 +1,14 @@
+@import "katex/dist/katex.min.css";
 @import "tailwindcss";
 @import "./swup-transitions.css";
 
 :root {
   /* 中英文自动空白 */
   text-autospace: normal;
+}
+
+body {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, serif;
 }
 
 .layout-overlay-header #main-header {

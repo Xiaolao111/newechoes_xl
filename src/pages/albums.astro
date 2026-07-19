@@ -1,16 +1,33 @@
 ---
 import Layout from "@/components/Layout.astro";
-import PhotoAlbumMasonry from "@/components/PhotoAlbumMasonry";
-import { PHOTO_ALBUM_CONFIG } from "@/consts";
+import WorldHeatmap from "@/components/WorldHeatmap";
+
+const VISITED_PLACES = [
+  "中国-黑龙江",
+  "中国-吉林",
+  "中国-辽宁",
+  "中国-北京",
+  "中国-天津",
+  "中国-山东",
+  "中国-江苏",
+  "中国-安徽",
+  "中国-广东",
+  "中国-福建",
+  "中国-重庆",
+  "中国-江西",
+  "中国-浙江",
+  "韩国",
+];
 ---
 
 <Layout
-  title="相册"
-  description="旅行和生活照片合集"
+  title="旅行足迹"
+  description="我去过的地方"
 >
-  <PhotoAlbumMasonry
-    shareUrl={PHOTO_ALBUM_CONFIG.shareUrl}
-    title={PHOTO_ALBUM_CONFIG.title}
-    client:load
-  />
+  <section class="container mx-auto px-4 py-8">
+    <h1 class="mb-6 text-center text-3xl font-semibold">我的旅行足迹</h1>
+    <div class="mx-auto rounded-xl bg-white p-6 shadow-lg hover:shadow-xl dark:bg-gray-800">
+      <WorldHeatmap client:only="react" visitedPlaces={VISITED_PLACES} />
+    </div>
+  </section>
 </Layout>

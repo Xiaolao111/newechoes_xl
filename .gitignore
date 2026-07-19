@@ -4,10 +4,19 @@ dist/
 # generated types
 .astro/
 
+# local build and test caches
+.vite/
+.cache/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
 # dependencies
 node_modules/
 
 # logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -15,7 +24,8 @@ pnpm-debug.log*
 
 # environment variables
 .env
-.env.production
+.env.*
+!.env.example
 
 # macOS-specific files
 .DS_Store
@@ -24,13 +34,16 @@ pnpm-debug.log*
 .idea/
 
 # wasm
-**/target/*
-**/pkg/*
+wasm/**/target/
+wasm/**/pkg/
 
 # vercel
-.vercel
+.vercel/
 
-#helloagents
-.helloagents/plan
-.helloagents/archive
+# local OSS CLI reports
+ossutil_output/
+
+# HelloAgents generated planning records
+.helloagents/plan/
+.helloagents/archive/
 .helloagents/CHANGELOG.md

@@ -201,6 +201,31 @@
   margin-top: 1em;
 }
 
+/* Markdown 图片的 alt 文本会作为图注显示 */
+.prose .article-figure {
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.prose .article-figure > img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 0.5rem;
+}
+
+.prose .article-figure figcaption {
+  margin-top: 0.65rem;
+  color: var(--color-gray-600);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+[data-theme="dark"] .prose .article-figure figcaption {
+  color: var(--color-gray-400);
+}
+
 /* 链接样式 */
 .prose a {
   color: var(--color-primary-600);
