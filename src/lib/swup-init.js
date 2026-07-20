@@ -117,6 +117,13 @@ function syncHomeBodyClasses() {
   const isHome = path === '/' || path === '';
   document.body.classList.toggle('layout-overlay-header', isHome);
   document.body.classList.toggle('layout-full-bleed', isHome);
+
+  // Footer sits outside Swup's <main> container. Keep it in the DOM and only
+  // hide it on the homepage, so leaving home via SPA navigation can show it.
+  const footer = document.getElementById('site-footer');
+  if (footer) {
+    footer.classList.toggle('hidden', isHome);
+  }
 }
 
 // 检查是否是文章相关页面

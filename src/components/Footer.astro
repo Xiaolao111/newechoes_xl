@@ -4,6 +4,9 @@ interface Props {}
 const {} = Astro.props;
 
 const currentYear = new Date().getFullYear();
+// 有正式备案号后，把文案改成例如「沪ICP备xxxxxxxx号」
+const beianText = "苏ICP备2026028642号";
+const beianHref = "https://beian.miit.gov.cn/";
 ---
 
 <footer
@@ -15,25 +18,18 @@ const currentYear = new Date().getFullYear();
     <div
       class="text-sm text-gray-500 dark:text-gray-500 font-light flex flex-wrap items-center justify-center gap-2"
     >
-      <a
-        href="https://blog.lsy22.com"
-        class="hover:text-primary-600 dark:hover:text-primary-400"
-      >
-        © {currentYear} New Echoes. All rights reserved.
-      </a>
+      <span>© {currentYear} xiaolao</span>
       <span
         aria-hidden="true"
         class="hidden sm:inline"
         >·</span
       >
       <a
-        href="/sitemap.xml"
-        target="_blank"
-        rel="noopener noreferrer"
+        href="/about"
         class="hover:text-primary-600 dark:hover:text-primary-400"
-        aria-label="网站地图"
+        data-astro-prefetch="hover"
       >
-        Sitemap
+        关于
       </a>
       <span
         aria-hidden="true"
@@ -48,6 +44,19 @@ const currentYear = new Date().getFullYear();
         aria-label="RSS订阅"
       >
         RSS
+      </a>
+      <span
+        aria-hidden="true"
+        class="hidden sm:inline"
+        >·</span
+      >
+      <a
+        href={beianHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="hover:text-primary-600 dark:hover:text-primary-400"
+      >
+        {beianText}
       </a>
     </div>
   </div>

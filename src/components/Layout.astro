@@ -65,7 +65,7 @@ const useOverlayHeader = headerMode === "overlay";
     <link
       rel="icon"
       type="image/svg+xml"
-      href="/favicon.svg"
+      href="/favicon.png"
     />
     <meta
       name="generator"
@@ -363,6 +363,15 @@ const useOverlayHeader = headerMode === "overlay";
       {!skipSrTitle && <h1 class="sr-only">{title}</h1>}
       <slot />
     </main>
-    {!isCardPreview && !hideFooter && <Footer />}
+    {
+      !isCardPreview && (
+        <div
+          id="site-footer"
+          class:list={[{ hidden: hideFooter }]}
+        >
+          <Footer />
+        </div>
+      )
+    }
   </body>
 </html>

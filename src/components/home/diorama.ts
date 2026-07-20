@@ -1706,6 +1706,22 @@ export function initDiorama() {
   };
   canvasEl.addEventListener("pointerdown", pointerDownHandler);
 
+  let tweenRafId = 0;
+  let navFailSafeTimer = 0;
+
+  const unlockInteraction = () => {
+    tweening = false;
+    controls.enabled = true;
+    if (navFailSafeTimer) {
+      window.clearTimeout(navFailSafeTimer);
+      navFailSafeTimer = 0;
+    }
+    if (tweenRafId) {
+      cancelAnimationFrame(tweenRafId);
+      tweenRafId = 0;
+    }
+  };
+
   const pointerUpHandler = (e: PointerEvent) => {
     if (tweening) return;
 
@@ -1727,6 +1743,12 @@ export function initDiorama() {
     const endPos = objPos.clone().add(dir.multiplyScalar(1.5));
     const endTarget = objPos;
 
+    // If navigation is blocked/interrupted, unlock orbit after a short delay
+    // so the homepage does not stay frozen until a full remount.
+    navFailSafeTimer = window.setTimeout(() => {
+      unlockInteraction();
+    }, 2500);
+
     const duration = 650;
     const t0 = performance.now();
     const step = () => {
@@ -1734,10 +1756,14 @@ export function initDiorama() {
       const ee = easeInOutCubic(t);
       camera.position.lerpVectors(startPos, endPos, ee);
       controls.target.lerpVectors(startTarget, endTarget, ee);
-      if (t < 1) requestAnimationFrame(step);
-      else window.location.href = hit.route;
+      if (t < 1) {
+        tweenRafId = requestAnimationFrame(step);
+        return;
+      }
+      tweenRafId = 0;
+      window.location.assign(hit.route);
     };
-    requestAnimationFrame(step);
+    tweenRafId = requestAnimationFrame(step);
   };
   canvasEl.addEventListener("pointerup", pointerUpHandler);
 
@@ -2123,6 +2149,7 @@ export function initDiorama() {
 
   // ===== Cleanup =====
   const cleanup = () => {
+    unlockInteraction();
     if (rafId) cancelAnimationFrame(rafId);
     canvasEl.removeEventListener("wheel", wheelHandler);
     canvasEl.removeEventListener("touchstart", touchStart);
