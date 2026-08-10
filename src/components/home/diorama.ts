@@ -1,6 +1,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { HOME_PROFILE } from "@/consts";
+import {
+  loadMusicPlaylist,
+  next as playNextTrack,
+  previous as playPreviousTrack,
+  subscribeMusicPlayer,
+  togglePlayback,
+  type MusicPlayerState,
+} from "@/lib/music/player";
 
 const CLEANUP_KEY = "__homeDioramaCleanup";
 
@@ -131,6 +139,7 @@ type Interactive = {
   label: string;
   route: string;
   basePos: THREE.Vector3;
+  kind?: "music";
 };
 
 export function initDiorama() {
@@ -144,6 +153,88 @@ export function initDiorama() {
 
   const hintEl = document.querySelector<HTMLElement>("[data-diorama-hint]");
   const tooltip = document.querySelector<HTMLElement>("[data-diorama-tooltip]");
+  const musicPlayer = document.querySelector<HTMLElement>(
+    "[data-diorama-music-player]",
+  );
+  const musicCover = musicPlayer?.querySelector<HTMLImageElement>("[data-music-cover]");
+  const musicTitle = musicPlayer?.querySelector<HTMLElement>("[data-music-title]");
+  const musicArtist = musicPlayer?.querySelector<HTMLElement>("[data-music-artist]");
+  const musicError = musicPlayer?.querySelector<HTMLElement>("[data-music-error]");
+  const musicToggle = musicPlayer?.querySelector<HTMLButtonElement>("[data-music-toggle]");
+  const musicPrevious = musicPlayer?.querySelector<HTMLButtonElement>("[data-music-previous]");
+  const musicNext = musicPlayer?.querySelector<HTMLButtonElement>("[data-music-next]");
+  const musicPlayIcon = musicPlayer?.querySelector<SVGElement>("[data-music-play-icon]");
+  const musicPauseIcon = musicPlayer?.querySelector<SVGElement>("[data-music-pause-icon]");
+
+  let musicPlayerHovered = false;
+  let musicHideTimer = 0;
+  let musicIsPlaying = false;
+
+  const renderMusicPlayer = (state: MusicPlayerState) => {
+    musicIsPlaying = state.isPlaying;
+    if (musicCover) {
+      musicCover.src = state.track.cover;
+      musicCover.alt = `${state.track.title} 封面`;
+    }
+    if (musicTitle) musicTitle.textContent = state.track.title;
+    if (musicArtist) musicArtist.textContent = state.track.artist;
+    if (musicError) musicError.textContent = state.error ?? "";
+    if (musicToggle) musicToggle.ariaLabel = state.isPlaying ? "暂停" : "播放";
+    if (musicPlayIcon) musicPlayIcon.hidden = state.isPlaying;
+    if (musicPauseIcon) musicPauseIcon.hidden = !state.isPlaying;
+  };
+
+  const unsubscribeMusicPlayer = subscribeMusicPlayer(renderMusicPlayer);
+  void loadMusicPlaylist();
+
+  const cancelMusicHide = () => {
+    if (!musicHideTimer) return;
+    window.clearTimeout(musicHideTimer);
+    musicHideTimer = 0;
+  };
+
+  const showMusicPlayer = (clientX: number, clientY: number) => {
+    if (!musicPlayer) return;
+    cancelMusicHide();
+    if (!musicPlayer.classList.contains("is-visible")) {
+      const panelWidth = Math.min(336, window.innerWidth - 32);
+      const left = Math.min(clientX + 18, window.innerWidth - panelWidth - 16);
+      const top = Math.min(clientY + 18, window.innerHeight - 150);
+      musicPlayer.style.left = `${Math.max(16, left)}px`;
+      musicPlayer.style.top = `${Math.max(72, top)}px`;
+    }
+    musicPlayer.classList.add("is-visible");
+    musicPlayer.setAttribute("aria-hidden", "false");
+  };
+
+  const hideMusicPlayer = () => {
+    if (!musicPlayer || musicPlayerHovered) return;
+    musicPlayer.classList.remove("is-visible");
+    musicPlayer.setAttribute("aria-hidden", "true");
+  };
+
+  const scheduleMusicHide = () => {
+    cancelMusicHide();
+    musicHideTimer = window.setTimeout(hideMusicPlayer, 180);
+  };
+
+  const musicMouseEnter = () => {
+    musicPlayerHovered = true;
+    cancelMusicHide();
+  };
+  const musicMouseLeave = () => {
+    musicPlayerHovered = false;
+    scheduleMusicHide();
+  };
+  const musicToggleHandler = () => void togglePlayback();
+  const musicPreviousHandler = () => void playPreviousTrack();
+  const musicNextHandler = () => void playNextTrack();
+
+  musicPlayer?.addEventListener("mouseenter", musicMouseEnter);
+  musicPlayer?.addEventListener("mouseleave", musicMouseLeave);
+  musicToggle?.addEventListener("click", musicToggleHandler);
+  musicPrevious?.addEventListener("click", musicPreviousHandler);
+  musicNext?.addEventListener("click", musicNextHandler);
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -208,10 +299,6 @@ export function initDiorama() {
   const screenLight = new THREE.PointLight(0xede8df, 0.3, 1.2, 1.5);
   screenLight.position.set(0.1, 0.6, -0.25);
   scene.add(screenLight);
-
-  const tvLight = new THREE.PointLight(0xff8866, 0.3, 2.5, 1.6);
-  tvLight.position.set(-2.8, 1.3, -0.5);
-  scene.add(tvLight);
 
   // ===== Materials =====
   const mats = {
@@ -293,15 +380,15 @@ export function initDiorama() {
   rightWall.receiveShadow = true;
   scene.add(rightWall);
 
-  // Back wall: 4 strips framing a window opening
-  const winW = 1.9;
-  const winH = 1.5;
+  // Back wall: slim strips framing a near floor-to-ceiling window opening.
+  const winW = 3.15;
   const winCx = 0;
-  const winCy = 1.55;
+  const wB = roomFloorY + 0.08;
+  const wT = roomCeilingY - 0.18;
+  const winH = wT - wB;
+  const winCy = (wT + wB) / 2;
   const wL = winCx - winW / 2;
   const wR = winCx + winW / 2;
-  const wB = winCy - winH / 2;
-  const wT = winCy + winH / 2;
 
   const topStripH = roomCeilingY - wT;
   const topStrip = new THREE.Mesh(
@@ -338,7 +425,7 @@ export function initDiorama() {
   rightStripBack.receiveShadow = true;
   scene.add(rightStripBack);
 
-  // ===== Window (redesigned: thicker frame, 4 panes, sill) =====
+  // ===== Floor-to-ceiling window (frame, 4 panes, floor threshold) =====
   const winFrame = new THREE.Group();
   const frameT = 0.11;
   const frameDepth = 0.12;
@@ -389,7 +476,7 @@ export function initDiorama() {
   hMullion.position.set(winCx, winCy, roomBackZ + 0.04);
   winFrame.add(hMullion);
 
-  // Window sill (inside room, small plank below window)
+  // A shallow floor threshold replaces the raised windowsill.
   const sillW = winW + frameT * 2 + 0.18;
   const sillDepth = 0.22;
   const sill = new THREE.Mesh(
@@ -411,13 +498,90 @@ export function initDiorama() {
   windowHitbox.position.set(winCx, winCy, roomBackZ + 0.05);
   scene.add(windowHitbox);
 
-  // ===== Outside (sky + sun + clouds + particles) =====
+  // ===== Outside (sky + beach + sea + sun + clouds + particles) =====
   const skyPlane = new THREE.Mesh(
     new THREE.PlaneGeometry(12, 9),
     mats.sky,
   );
   skyPlane.position.set(0, 2, roomBackZ - 3);
   scene.add(skyPlane);
+
+  // Layered seaside view, composed from back to front.
+  const seaMaterial = new THREE.MeshBasicMaterial({ color: 0x58aeca });
+  const sea = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 1.9),
+    seaMaterial,
+  );
+  sea.position.set(0, 0.55, roomBackZ - 2.55);
+  scene.add(sea);
+
+  const beachMaterial = new THREE.MeshBasicMaterial({ color: 0xe7c58d });
+  const beach = new THREE.Mesh(
+    new THREE.PlaneGeometry(12, 1.05),
+    beachMaterial,
+  );
+  beach.position.set(0, -0.1, roomBackZ - 1.95);
+  scene.add(beach);
+
+  // A low island silhouette breaks up the horizon.
+  const islandShape = new THREE.Shape();
+  islandShape.moveTo(-1.25, 0);
+  islandShape.bezierCurveTo(-0.9, 0.08, -0.72, 0.32, -0.42, 0.28);
+  islandShape.bezierCurveTo(-0.12, 0.5, 0.18, 0.46, 0.38, 0.25);
+  islandShape.bezierCurveTo(0.7, 0.3, 0.92, 0.1, 1.25, 0);
+  islandShape.lineTo(-1.25, 0);
+  const islandMaterial = new THREE.MeshBasicMaterial({ color: 0x55765a });
+  const island = new THREE.Mesh(
+    new THREE.ShapeGeometry(islandShape, 12),
+    islandMaterial,
+  );
+  island.position.set(-0.65, 1.28, roomBackZ - 2.2);
+  island.scale.set(0.75, 0.75, 1);
+  scene.add(island);
+
+  // Soft animated foam lines where the sea meets the sand.
+  const foamMaterial = new THREE.MeshBasicMaterial({
+    color: 0xf8fbf6,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  type BeachWaveData = { mesh: THREE.Mesh; baseX: number; phase: number };
+  const beachWaveData: BeachWaveData[] = [];
+  const makeFoamShape = (width: number, thickness: number, phase: number) => {
+    const shape = new THREE.Shape();
+    const points = 28;
+    for (let i = 0; i <= points; i++) {
+      const x = -width / 2 + (width * i) / points;
+      const y = Math.sin((i / points) * Math.PI * 4 + phase) * 0.025;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    for (let i = points; i >= 0; i--) {
+      const x = -width / 2 + (width * i) / points;
+      const y =
+        Math.sin((i / points) * Math.PI * 4 + phase) * 0.025 - thickness;
+      shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return new THREE.ShapeGeometry(shape);
+  };
+  [
+    { y: 0.52, width: 4.8, phase: 0 },
+    { y: 0.7, width: 4.2, phase: 1.7 },
+    { y: 0.88, width: 3.6, phase: 3.1 },
+  ].forEach((wave, index) => {
+    const foam = new THREE.Mesh(
+      makeFoamShape(wave.width, 0.025, wave.phase),
+      foamMaterial,
+    );
+    const baseX = index % 2 === 0 ? -0.25 : 0.35;
+    // Keep foam in front of the sea but behind the foreground beach.
+    foam.position.set(baseX, wave.y, roomBackZ - 2.08 + index * 0.015);
+    beachWaveData.push({ mesh: foam, baseX, phase: wave.phase });
+    scene.add(foam);
+  });
 
   // Sun (bright disc, visible through window on sunny seasons)
   const sunDisc = new THREE.Mesh(
@@ -637,9 +801,9 @@ export function initDiorama() {
   // ===== Laptop (→ /projects) =====
   const laptop = new THREE.Group();
 
-  const lpBaseW = 1.25;
-  const lpBaseD = 0.88;
-  const lpBaseH = 0.05;
+  const lpBaseW = 1.1;
+  const lpBaseD = 0.76;
+  const lpBaseH = 0.034;
 
   const lpBase = new THREE.Mesh(
     new THREE.BoxGeometry(lpBaseW, lpBaseH, lpBaseD),
@@ -653,9 +817,9 @@ export function initDiorama() {
   // Screen (hinged at back edge)
   const lpScreenGroup = new THREE.Group();
   lpScreenGroup.position.set(0, lpBaseH + 0.005, -lpBaseD / 2 + 0.02);
-  const lpScreenW = 1.2;
-  const lpScreenH = 0.78;
-  const lpScreenT = 0.026;
+  const lpScreenW = 1.05;
+  const lpScreenH = 0.68;
+  const lpScreenT = 0.017;
   const lpScreenBody = new THREE.Mesh(
     new THREE.BoxGeometry(lpScreenW, lpScreenH, lpScreenT),
     mats.laptopFrame,
@@ -691,11 +855,11 @@ export function initDiorama() {
   // Keyboard (InstancedMesh)
   const cols = 11;
   const rows = 4;
-  const keyW = 0.075;
-  const keyD = 0.068;
-  const keyH = 0.014;
-  const keyGapX = 0.012;
-  const keyGapZ = 0.013;
+  const keyW = 0.066;
+  const keyD = 0.058;
+  const keyH = 0.011;
+  const keyGapX = 0.01;
+  const keyGapZ = 0.011;
   const kbW = cols * keyW + (cols - 1) * keyGapX;
   const kbX0 = -kbW / 2;
   const kbZ0 = -0.28; // starting z (toward hinge)
@@ -733,80 +897,393 @@ export function initDiorama() {
 
   // Trackpad (visual only)
   const trackpad = new THREE.Mesh(
-    new THREE.BoxGeometry(0.38, 0.003, 0.22),
+    new THREE.BoxGeometry(0.33, 0.002, 0.18),
     mats.laptopFrame,
   );
-  trackpad.position.set(0, lpBaseH + 0.002, 0.28);
+  trackpad.position.set(0, lpBaseH + 0.002, 0.245);
   laptop.add(trackpad);
 
   laptop.position.set(0.1, deskTopWorldY, -0.2);
   scene.add(laptop);
 
-  // ===== Book stack (→ /articles?collection=books) =====
-  const bookStack = new THREE.Group();
-  const bookSizes: [number, number, number, THREE.Material][] = [
-    [0.52, 0.11, 0.38, mats.books[0]],
-    [0.48, 0.09, 0.36, mats.books[1]],
-    [0.5, 0.1, 0.37, mats.books[2]],
-  ];
-  let bookY = 0;
-  bookSizes.forEach(([w, h, d, mat]) => {
-    const book = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    book.position.y = bookY + h / 2;
-    book.rotation.y = (Math.random() - 0.5) * 0.25;
-    book.castShadow = true;
-    bookStack.add(book);
-    bookY += h + 0.003;
+  // ===== Coffee cup (right side of desk) =====
+  const coffeeCup = new THREE.Group();
+  const cupCeramicMaterial = new THREE.MeshToonMaterial({ color: 0xf1e4d2 });
+  const coffeeMaterial = new THREE.MeshBasicMaterial({ color: 0x4a2818 });
+  const iceMaterial = new THREE.MeshToonMaterial({
+    color: 0xd9f2f5,
+    transparent: true,
+    opacity: 0.78,
   });
-  bookStack.position.set(1.3, deskTopWorldY, -0.85);
-  scene.add(bookStack);
+  const steamMaterial = new THREE.MeshBasicMaterial({
+    color: 0xc7d0d3,
+    transparent: true,
+    opacity: 0.46,
+    depthWrite: false,
+  });
 
-  // ===== Notebook + pen (→ /articles) =====
-  const notebook = new THREE.Group();
-  const notebookCover = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.03, 0.3),
-    mats.books[0],
+  // A small, straight-sided everyday mug.
+  const cupBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.105, 0.105, 0.22, 24, 1, true),
+    cupCeramicMaterial,
   );
-  notebookCover.position.y = 0.015;
-  notebookCover.castShadow = true;
-  notebookCover.receiveShadow = true;
-  notebook.add(notebookCover);
-  // Pages peek (slightly smaller, offset)
-  const pages = new THREE.Mesh(
-    new THREE.BoxGeometry(0.4, 0.018, 0.28),
-    new THREE.MeshToonMaterial({ color: 0xf4efe3 }),
-  );
-  pages.position.set(0.005, 0.008, 0.005);
-  notebook.add(pages);
-  // Spine-side stripe (binding)
-  const spine = new THREE.Mesh(
-    new THREE.BoxGeometry(0.04, 0.031, 0.3),
-    mats.deskLeg,
-  );
-  spine.position.set(-0.19, 0.016, 0);
-  notebook.add(spine);
-  // Pen resting on notebook
-  const penBody = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.01, 0.01, 0.26, 10),
-    mats.lampBody,
-  );
-  penBody.rotation.z = Math.PI / 2;
-  penBody.rotation.y = 0.2;
-  penBody.position.set(0.04, 0.045, 0.08);
-  penBody.castShadow = true;
-  notebook.add(penBody);
-  const penTip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.01, 0.03, 8),
-    mats.books[2],
-  );
-  penTip.rotation.z = -Math.PI / 2;
-  penTip.rotation.y = 0.2;
-  penTip.position.set(0.17, 0.045, 0.105);
-  notebook.add(penTip);
+  cupBody.position.y = 0.11;
+  cupBody.castShadow = true;
+  cupBody.receiveShadow = true;
+  coffeeCup.add(cupBody);
 
-  notebook.position.set(-1.05, deskTopWorldY, -0.2);
-  notebook.rotation.y = -0.25;
-  scene.add(notebook);
+  const cupRim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.105, 0.01, 8, 28),
+    cupCeramicMaterial,
+  );
+  cupRim.rotation.x = Math.PI / 2;
+  cupRim.position.y = 0.22;
+  cupRim.castShadow = true;
+  coffeeCup.add(cupRim);
+
+  const coffeeSurface = new THREE.Mesh(
+    new THREE.CircleGeometry(0.092, 28),
+    coffeeMaterial,
+  );
+  coffeeSurface.rotation.x = -Math.PI / 2;
+  coffeeSurface.position.y = 0.219;
+  coffeeCup.add(coffeeSurface);
+
+  const cupHandle = new THREE.Mesh(
+    new THREE.TorusGeometry(0.06, 0.016, 8, 22),
+    cupCeramicMaterial,
+  );
+  // Keep the loop in a vertical radial plane so it projects out from the mug,
+  // rather than lying tangent to the cup wall.
+  cupHandle.position.set(0.115, 0.115, 0);
+  cupHandle.scale.set(1, 1.08, 1);
+  cupHandle.castShadow = true;
+  coffeeCup.add(cupHandle);
+
+  // Ice cubes sit partly above the coffee surface in light mode.
+  const iceCubes = new THREE.Group();
+  [
+    { x: -0.035, z: -0.02, ry: 0.35 },
+    { x: 0.035, z: 0.018, ry: -0.42 },
+    { x: 0.005, z: -0.05, ry: 0.8 },
+  ].forEach(({ x, z, ry }, index) => {
+    const ice = new THREE.Mesh(
+      new THREE.BoxGeometry(0.052, 0.036, 0.052),
+      iceMaterial,
+    );
+    ice.position.set(x, 0.232 + index * 0.002, z);
+    ice.rotation.set(index * 0.08, ry, index * 0.06);
+    ice.castShadow = true;
+    iceCubes.add(ice);
+  });
+  coffeeCup.add(iceCubes);
+
+  // Night mode swaps the ice for two soft curls of steam.
+  const coffeeSteam = new THREE.Group();
+  [-0.026, 0.026].forEach((x, index) => {
+    const steamCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x, 0.235, 0),
+      new THREE.Vector3(x + 0.018, 0.31, 0),
+      new THREE.Vector3(x - 0.015, 0.39, 0),
+      new THREE.Vector3(x + 0.012, 0.47, 0),
+    ]);
+    const steam = new THREE.Mesh(
+      new THREE.TubeGeometry(steamCurve, 18, 0.0045, 5, false),
+      steamMaterial,
+    );
+    steam.position.z = index === 0 ? -0.012 : 0.012;
+    coffeeSteam.add(steam);
+  });
+  coffeeSteam.visible = false;
+  coffeeCup.add(coffeeSteam);
+
+  coffeeCup.position.set(0.95, deskTopWorldY, -0.2);
+  coffeeCup.rotation.y = -0.12;
+  scene.add(coffeeCup);
+
+  // ===== Closed notebook (desk-right corner → /articles) =====
+  const deskNotebook = new THREE.Group();
+  const notebookCoverMaterial = new THREE.MeshToonMaterial({ color: 0x496b67 });
+  const notebookPageMaterial = new THREE.MeshToonMaterial({ color: 0xeee7d7 });
+  const notebookDetailMaterial = new THREE.MeshToonMaterial({ color: 0xc8a66a });
+
+  const notebookPages = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.052, 0.3),
+    notebookPageMaterial,
+  );
+  notebookPages.position.y = 0.045;
+  notebookPages.castShadow = true;
+  deskNotebook.add(notebookPages);
+
+  [0.012, 0.08].forEach((y) => {
+    const cover = new THREE.Mesh(
+      new THREE.BoxGeometry(0.48, 0.018, 0.34),
+      notebookCoverMaterial,
+    );
+    cover.position.y = y;
+    cover.castShadow = true;
+    deskNotebook.add(cover);
+  });
+
+  const notebookSpine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.028, 0.086, 0.35),
+    notebookCoverMaterial,
+  );
+  notebookSpine.position.set(-0.235, 0.045, 0);
+  notebookSpine.castShadow = true;
+  deskNotebook.add(notebookSpine);
+
+  // A narrow elastic strap and a small cover label.
+  const notebookStrap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.022, 0.012, 0.35),
+    notebookDetailMaterial,
+  );
+  notebookStrap.position.set(0.15, 0.096, 0);
+  deskNotebook.add(notebookStrap);
+
+  const notebookLabel = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.19, 0.09),
+    notebookPageMaterial,
+  );
+  notebookLabel.rotation.x = -Math.PI / 2;
+  notebookLabel.position.set(-0.02, 0.092, -0.015);
+  deskNotebook.add(notebookLabel);
+
+  deskNotebook.position.set(1.48, deskTopWorldY, 0.08);
+  deskNotebook.rotation.y = 0.14;
+  scene.add(deskNotebook);
+
+  // ===== Sleeping orange-and-white cat (→ /articles) =====
+  // Procedural low-poly model based on the owner's mostly-white ginger cat.
+  const sleepingCat = new THREE.Group();
+  const catWhite = new THREE.MeshToonMaterial({ color: 0xf5f1e8 });
+  const catGinger = new THREE.MeshToonMaterial({ color: 0xc8793c });
+  const catLightGinger = new THREE.MeshToonMaterial({ color: 0xe4a064 });
+  const catPink = new THREE.MeshToonMaterial({ color: 0xd99b91 });
+  const catDark = new THREE.MeshBasicMaterial({ color: 0x30251f });
+
+  const catBodyBaseScale = new THREE.Vector3(1.15, 0.62, 0.85);
+  const catBody = new THREE.Mesh(
+    new THREE.SphereGeometry(0.34, 24, 16),
+    catWhite,
+  );
+  catBody.scale.copy(catBodyBaseScale);
+  catBody.position.set(0.08, 0.22, -0.01);
+  catBody.castShadow = true;
+  catBody.receiveShadow = true;
+  sleepingCat.add(catBody);
+
+  // The ginger rump is sunk deeply into the white body instead of sitting
+  // above it, so the colour transition reads as one continuous coat.
+  const rumpPatch = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 18, 12),
+    catGinger,
+  );
+  rumpPatch.scale.set(0.8, 0.72, 0.78);
+  rumpPatch.position.set(0.33, 0.24, -0.055);
+  rumpPatch.castShadow = true;
+  sleepingCat.add(rumpPatch);
+
+  // Colour the forehead directly on the sphere vertices. Unlike an overlay
+  // mesh, the ginger fringe now follows the exact curvature of the head.
+  const catHeadGeometry = new THREE.SphereGeometry(0.2, 40, 24);
+  const headPositions = catHeadGeometry.getAttribute("position");
+  const headColors = new Float32Array(headPositions.count * 3);
+  const headWhiteColor = new THREE.Color(0xf5f1e8);
+  const headGingerColor = new THREE.Color(0xc8793c);
+  for (let i = 0; i < headPositions.count; i += 1) {
+    const nx = headPositions.getX(i) / 0.2;
+    const ny = headPositions.getY(i) / 0.2;
+    const nz = headPositions.getZ(i) / 0.2;
+    const absX = Math.abs(nx);
+
+    // Each lock starts near the middle of the crown and opens outward as it
+    // descends, forming a curved 八字 pattern with a narrow white centre.
+    const descent = clamp((0.58 - ny) / 0.72);
+    const lockCenter = 0.16 + descent * 0.3;
+    const lockHalfWidth = 0.12 + descent * 0.06;
+    const onFront = nz > 0.22;
+    const inLock =
+      ny > 0.2 &&
+      ny < 0.72 &&
+      Math.abs(absX - lockCenter) < lockHalfWidth;
+    const onCrown = ny >= 0.5 && absX > 0.08 && absX < 0.82;
+    const color = onFront && (inLock || onCrown)
+      ? headGingerColor
+      : headWhiteColor;
+
+    headColors[i * 3] = color.r;
+    headColors[i * 3 + 1] = color.g;
+    headColors[i * 3 + 2] = color.b;
+  }
+  catHeadGeometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(headColors, 3),
+  );
+  const catHeadMaterial = new THREE.MeshToonMaterial({ vertexColors: true });
+  const catHead = new THREE.Mesh(catHeadGeometry, catHeadMaterial);
+  catHead.scale.set(1, 0.88, 0.94);
+  catHead.position.set(-0.28, 0.25, 0.12);
+  catHead.castShadow = true;
+  sleepingCat.add(catHead);
+
+  const catEarGinger = new THREE.MeshToonMaterial({
+    color: 0xc8793c,
+    side: THREE.DoubleSide,
+  });
+  const catEarPink = new THREE.MeshToonMaterial({
+    color: 0xd99b91,
+    side: THREE.DoubleSide,
+  });
+  const makeCatEar = (x: number, rotationZ: number) => {
+    // The orange frame and pink centre tile the same flat surface. The hole
+    // prevents overlap, so the inner colour is part of the ear, not a layer.
+    const outerEarShape = new THREE.Shape();
+    outerEarShape.moveTo(0, 0.075);
+    outerEarShape.lineTo(-0.075, -0.075);
+    outerEarShape.lineTo(0.075, -0.075);
+    outerEarShape.closePath();
+
+    const innerEarHole = new THREE.Path();
+    innerEarHole.moveTo(0, 0.045);
+    innerEarHole.lineTo(0.034, -0.042);
+    innerEarHole.lineTo(-0.034, -0.042);
+    innerEarHole.closePath();
+    outerEarShape.holes.push(innerEarHole);
+
+    const innerEarShape = new THREE.Shape();
+    innerEarShape.moveTo(0, 0.045);
+    innerEarShape.lineTo(-0.034, -0.042);
+    innerEarShape.lineTo(0.034, -0.042);
+    innerEarShape.closePath();
+
+    const earGroup = new THREE.Group();
+    const outerEar = new THREE.Mesh(
+      new THREE.ShapeGeometry(outerEarShape),
+      catEarGinger,
+    );
+    const innerEar = new THREE.Mesh(
+      new THREE.ShapeGeometry(innerEarShape),
+      catEarPink,
+    );
+    outerEar.castShadow = true;
+    earGroup.add(outerEar, innerEar);
+    earGroup.position.set(x, 0.43, 0.18);
+    earGroup.rotation.z = rotationZ;
+    sleepingCat.add(earGroup);
+  };
+  makeCatEar(-0.39, 0.16);
+  makeCatEar(-0.17, -0.16);
+
+  // Closed eyes and tucked paws make the sleeping pose readable.
+  for (const x of [-0.34, -0.22]) {
+    const eye = new THREE.Mesh(
+      new THREE.BoxGeometry(0.062, 0.009, 0.009),
+      catDark,
+    );
+    eye.position.set(x, 0.275, 0.304);
+    eye.rotation.z = x < -0.28 ? -0.08 : 0.08;
+    sleepingCat.add(eye);
+  }
+
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.025, 0.035, 3),
+    catPink,
+  );
+  nose.position.set(-0.28, 0.225, 0.315);
+  nose.rotation.x = Math.PI / 2;
+  sleepingCat.add(nose);
+
+  // Three whiskers on each cheek.
+  const whiskerMaterial = new THREE.MeshBasicMaterial({ color: 0x746960 });
+  const whiskerUp = new THREE.Vector3(0, 1, 0);
+  const addWhisker = (start: THREE.Vector3, end: THREE.Vector3) => {
+    const direction = end.clone().sub(start);
+    const whisker = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0025, 0.0025, direction.length(), 6),
+      whiskerMaterial,
+    );
+    whisker.position.copy(start).add(end).multiplyScalar(0.5);
+    whisker.quaternion.setFromUnitVectors(
+      whiskerUp,
+      direction.clone().normalize(),
+    );
+    sleepingCat.add(whisker);
+  };
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 3; i += 1) {
+      const start = new THREE.Vector3(
+        -0.28 + side * 0.075,
+        0.22 - i * 0.023,
+        0.31,
+      );
+      const end = new THREE.Vector3(
+        -0.28 + side * (0.245 + i * 0.012),
+        start.y + (1 - i) * 0.025,
+        0.325,
+      );
+      addWhisker(start, end);
+    }
+  }
+
+  for (const x of [-0.2, -0.08]) {
+    const paw = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 16, 10),
+      catWhite,
+    );
+    paw.scale.set(1.25, 0.45, 0.72);
+    paw.position.set(x, 0.085, 0.16);
+    paw.castShadow = true;
+    sleepingCat.add(paw);
+  }
+
+  // The curled tail alternates dark and pale ginger in visible short rings.
+  const catTail = new THREE.Group();
+  const tailSegmentCount = 20;
+  const tailArc = Math.PI * 1.55;
+  const tailSegmentArc = tailArc / tailSegmentCount;
+  for (let i = 0; i < tailSegmentCount; i += 1) {
+    const segment = new THREE.Mesh(
+      new THREE.TorusGeometry(
+        0.28,
+        0.055,
+        12,
+        8,
+        tailSegmentArc + 0.025,
+      ),
+      i % 2 === 0 ? catGinger : catLightGinger,
+    );
+    segment.rotation.z = i * tailSegmentArc;
+    segment.castShadow = true;
+    catTail.add(segment);
+  }
+  catTail.rotation.set(Math.PI / 2, 0, -0.35);
+  catTail.position.set(0.12, 0.13, -0.005);
+  sleepingCat.add(catTail);
+
+  // Rounded root bridges the rump marking and curled tail.
+  const tailRoot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 16, 10),
+    catGinger,
+  );
+  tailRoot.scale.set(1.25, 0.72, 0.82);
+  tailRoot.position.set(0.35, 0.17, -0.08);
+  tailRoot.castShadow = true;
+  sleepingCat.add(tailRoot);
+
+  const tailTip = new THREE.Mesh(
+    new THREE.SphereGeometry(0.065, 14, 10),
+    catLightGinger,
+  );
+  tailTip.scale.set(1.35, 0.8, 0.8);
+  tailTip.position.set(-0.09, 0.13, 0.22);
+  tailTip.castShadow = true;
+  sleepingCat.add(tailTip);
+
+  sleepingCat.position.set(-1.05, deskTopWorldY, -0.2);
+  sleepingCat.rotation.y = -0.18;
+  sleepingCat.scale.setScalar(0.75);
+  scene.add(sleepingCat);
 
   // ===== Bonsai Tree (with 8 seasonal states) =====
   const plant = new THREE.Group();
@@ -1058,103 +1535,409 @@ export function initDiorama() {
 
   branchTips.forEach((tip, i) => addFoliageCluster(tip, i));
 
-  // Move plant toward desk center
-  plant.position.set(1.5, deskTopWorldY, -0.2);
+  // Occupy the rear-right spot formerly used by the desk book stack.
+  plant.position.set(1.3, deskTopWorldY, -0.85);
   scene.add(plant);
 
-  // ===== TV (wall-mounted on left wall → /movies) =====
-  const tv = new THREE.Group();
-  const tvW = 1.5;
-  const tvH = 0.9;
-  const tvD = 0.05;
-  const tvBody = new THREE.Mesh(
-    new THREE.BoxGeometry(tvW, tvH, tvD),
-    mats.tvBody,
-  );
-  tvBody.castShadow = true;
-  tv.add(tvBody);
+  // ===== Small bookshelf (back-right corner) =====
+  const bookshelf = new THREE.Group();
+  const bookshelfWood = new THREE.MeshToonMaterial({ color: 0x8b5c3e });
+  const shelfW = 0.86;
+  const shelfH = 1.42;
+  const shelfD = 0.32;
+  const shelfT = 0.065;
 
-  // TV screen with animated equalizer bars (CSS-loader style ported to canvas)
-  const tvScreenCanvas = document.createElement("canvas");
-  tvScreenCanvas.width = 640;
-  tvScreenCanvas.height = 360;
-  const tvScreenCtx = tvScreenCanvas.getContext("2d")!;
-  const tvScreenTexture = new THREE.CanvasTexture(tvScreenCanvas);
-  tvScreenTexture.colorSpace = THREE.SRGBColorSpace;
-  tvScreenTexture.generateMipmaps = false;
-  tvScreenTexture.minFilter = THREE.LinearFilter;
-  tvScreenTexture.magFilter = THREE.LinearFilter;
-  const tvScreenMat = new THREE.MeshBasicMaterial({
-    map: tvScreenTexture,
-    toneMapped: false,
+  const addShelfPart = (
+    width: number,
+    height: number,
+    depth: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    const part = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      bookshelfWood,
+    );
+    part.position.set(x, y, z);
+    part.castShadow = true;
+    part.receiveShadow = true;
+    bookshelf.add(part);
+  };
+
+  // Side panels, top, bottom, back and two middle shelves.
+  addShelfPart(shelfT, shelfH, shelfD, -shelfW / 2 + shelfT / 2, shelfH / 2, 0);
+  addShelfPart(shelfT, shelfH, shelfD, shelfW / 2 - shelfT / 2, shelfH / 2, 0);
+  addShelfPart(shelfW, shelfT, shelfD, 0, shelfT / 2, 0);
+  addShelfPart(shelfW, shelfT, shelfD, 0, shelfH - shelfT / 2, 0);
+  addShelfPart(shelfW, shelfH, 0.035, 0, shelfH / 2, -shelfD / 2);
+  [0.48, 0.92].forEach((y) => {
+    addShelfPart(shelfW - shelfT * 2, shelfT, shelfD, 0, y, 0);
   });
-  const tvScreenMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(tvW - 0.08, tvH - 0.08),
-    tvScreenMat,
+
+  const shelfBookRows = [
+    {
+      y: 0.1,
+      books: [
+        { w: 0.14, h: 0.28, color: 0 },
+        { w: 0.12, h: 0.34, color: 1 },
+        { w: 0.16, h: 0.25, color: 2 },
+        { w: 0.11, h: 0.31, color: 0 },
+      ],
+    },
+    {
+      y: 0.55,
+      books: [
+        { w: 0.13, h: 0.29, color: 2 },
+        { w: 0.15, h: 0.32, color: 0 },
+        { w: 0.1, h: 0.24, color: 1 },
+      ],
+    },
+    {
+      y: 0.99,
+      books: [
+        { w: 0.12, h: 0.26, color: 1 },
+        { w: 0.14, h: 0.31, color: 2 },
+        { w: 0.11, h: 0.28, color: 0 },
+      ],
+    },
+  ];
+  shelfBookRows.forEach(({ y, books }, rowIndex) => {
+    let x = -shelfW / 2 + shelfT + 0.04;
+    books.forEach(({ w, h, color }, bookIndex) => {
+      const book = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, shelfD * 0.58),
+        mats.books[color],
+      );
+      book.position.set(x + w / 2, y + h / 2, 0.025);
+      book.rotation.z =
+        bookIndex === books.length - 1 && rowIndex > 0 ? -0.12 : 0;
+      book.castShadow = true;
+      bookshelf.add(book);
+      x += w + 0.018;
+    });
+  });
+
+  bookshelf.position.set(2.55, roomFloorY, roomBackZ + shelfD / 2 + 0.025);
+  scene.add(bookshelf);
+
+  // ===== Retro record player (back-left corner) =====
+  const recordPlayer = new THREE.Group();
+  const recordWoodMaterial = new THREE.MeshToonMaterial({ color: 0x85563a });
+  const recordTrimMaterial = new THREE.MeshToonMaterial({ color: 0xc39358 });
+  const vinylMaterial = new THREE.MeshToonMaterial({ color: 0x17171b });
+  const recordLabelMaterial = new THREE.MeshToonMaterial({ color: 0xb94d45 });
+  const recordMetalMaterial = new THREE.MeshToonMaterial({ color: 0xb9ad99 });
+
+  const recordCabinet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.72, 0.5, 0.5),
+    recordWoodMaterial,
   );
-  tvScreenMesh.position.set(0, 0, tvD / 2 + 0.001);
-  tv.add(tvScreenMesh);
+  recordCabinet.position.y = 0.36;
+  recordCabinet.castShadow = true;
+  recordCabinet.receiveShadow = true;
+  recordPlayer.add(recordCabinet);
 
-  // Equalizer animation params — staggered delays create the wave pattern,
-  // mirroring the reference CSS keyframe `load`.
-  const TV_BAR_COUNT = 15;
-  const TV_BAR_DELAYS = [1.4, 1.2, 1.0, 0.8, 0.6, 0.4, 0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4];
-  const TV_CYCLE_SEC = 2.5;
+  // Short feet lift the cabinet slightly off the floor.
+  [
+    [-0.29, -0.19],
+    [0.29, -0.19],
+    [-0.29, 0.19],
+    [0.29, 0.19],
+  ].forEach(([x, z]) => {
+    const foot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.065, 0.12, 0.065),
+      recordWoodMaterial,
+    );
+    foot.position.set(x, 0.06, z);
+    foot.castShadow = true;
+    recordPlayer.add(foot);
+  });
 
-  const drawTvScreen = (nowMs: number) => {
-    const ctx = tvScreenCtx;
-    const W = tvScreenCanvas.width;
-    const H = tvScreenCanvas.height;
+  const recordTop = new THREE.Mesh(
+    new THREE.BoxGeometry(0.78, 0.055, 0.56),
+    recordTrimMaterial,
+  );
+  recordTop.position.y = 0.635;
+  recordTop.castShadow = true;
+  recordPlayer.add(recordTop);
 
-    // radial dark bg (CRT feel)
-    const bg = ctx.createRadialGradient(W / 2, H / 2, H * 0.1, W / 2, H / 2, H * 0.9);
-    bg.addColorStop(0, "#2a2a2a");
-    bg.addColorStop(1, "#050505");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
+  // Open lid behind the turntable.
+  const recordLid = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 0.48, 0.035),
+    recordWoodMaterial,
+  );
+  recordLid.position.set(0, 0.88, -0.245);
+  recordLid.rotation.x = -0.13;
+  recordLid.castShadow = true;
+  recordPlayer.add(recordLid);
 
-    // Bars
-    const step = W / TV_BAR_COUNT;
-    const barW = step * 0.55;
-    const padLR = (step - barW) / 2;
-    const t = nowMs / 1000;
+  const lidInset = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.61, 0.39),
+    new THREE.MeshToonMaterial({ color: 0x3b2922 }),
+  );
+  lidInset.position.set(0, 0.88, -0.224);
+  lidInset.rotation.x = -0.13;
+  recordPlayer.add(lidInset);
 
-    for (let i = 0; i < TV_BAR_COUNT; i++) {
-      // Each bar plays the same load keyframe with its own delay offset,
-      // reversed sign so cycle phase matches the CSS animation.
-      const cyclePos = (((t - TV_BAR_DELAYS[i]) % TV_CYCLE_SEC) + TV_CYCLE_SEC) % TV_CYCLE_SEC;
-      const half = TV_CYCLE_SEC / 2;
-      const norm = cyclePos < half ? cyclePos / half : 1 - (cyclePos - half) / half; // triangle 0→1→0
-      const heightPct = 0.1 + norm * 0.9;
-      const topPct = 0.25 * (1 - norm);
-      const barH = heightPct * H;
-      const barY = topPct * H;
-      const gray = Math.floor(204 - norm * 136); // #ccc → #444
-      ctx.fillStyle = `rgb(${gray},${gray},${gray})`;
-      const x = i * step + padLR;
-      // rounded bars
-      const r = barW / 2;
+  const platter = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.235, 0.235, 0.025, 32),
+    recordMetalMaterial,
+  );
+  platter.position.set(-0.06, 0.677, 0);
+  platter.castShadow = true;
+  recordPlayer.add(platter);
+
+  const spinningRecord = new THREE.Group();
+  spinningRecord.position.set(-0.06, 0.697, 0);
+  const vinyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.215, 0.215, 0.012, 40),
+    vinylMaterial,
+  );
+  vinyl.castShadow = true;
+  spinningRecord.add(vinyl);
+
+  const recordLabel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.068, 0.068, 0.014, 24),
+    recordLabelMaterial,
+  );
+  recordLabel.position.y = 0.008;
+  spinningRecord.add(recordLabel);
+
+  const spindle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.009, 0.009, 0.035, 10),
+    recordMetalMaterial,
+  );
+  spindle.position.y = 0.025;
+  spinningRecord.add(spindle);
+  recordPlayer.add(spinningRecord);
+
+  // Floating musical notes (visible while audio plays)
+  const noteGlyphs = ["♪", "♫", "♩", "♬"];
+  const makeNoteTexture = (glyph: string) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, 128, 128);
+      ctx.font = "72px Georgia, 'Times New Roman', serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#2b211c";
+      ctx.fillText(glyph, 64, 68);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  };
+
+  type FloatingNote = {
+    mesh: THREE.Sprite;
+    age: number;
+    life: number;
+    driftX: number;
+    driftZ: number;
+    spin: number;
+    rise: number;
+  };
+
+  const floatingNotes: FloatingNote[] = [];
+  const noteTextures = noteGlyphs.map(makeNoteTexture);
+  let noteSpawnAccum = 0;
+
+  const spawnFloatingNote = () => {
+    const material = new THREE.SpriteMaterial({
+      map: noteTextures[Math.floor(Math.random() * noteTextures.length)]!,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0,
+    });
+    const sprite = new THREE.Sprite(material);
+    const scale = 0.16 + Math.random() * 0.1;
+    sprite.scale.set(scale, scale, scale);
+    sprite.position.set(
+      recordPlayer.position.x - 0.06 + (Math.random() - 0.5) * 0.2,
+      recordPlayer.position.y + 0.75,
+      recordPlayer.position.z + (Math.random() - 0.5) * 0.18,
+    );
+    scene.add(sprite);
+    floatingNotes.push({
+      mesh: sprite,
+      age: 0,
+      life: 2.4 + Math.random() * 1.4,
+      driftX: (Math.random() - 0.5) * 0.22,
+      driftZ: (Math.random() - 0.5) * 0.18,
+      spin: (Math.random() - 0.5) * 1.2,
+      rise: 0.35 + Math.random() * 0.25,
+    });
+  };
+
+  // Curved tonearm resting over the outer edge of the record.
+  const tonearmCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0.27, 0.71, 0.13),
+    new THREE.Vector3(0.24, 0.75, 0.02),
+    new THREE.Vector3(0.13, 0.735, -0.08),
+    new THREE.Vector3(0.08, 0.72, -0.11),
+  ]);
+  const tonearm = new THREE.Mesh(
+    new THREE.TubeGeometry(tonearmCurve, 22, 0.012, 7, false),
+    recordMetalMaterial,
+  );
+  tonearm.castShadow = true;
+  recordPlayer.add(tonearm);
+
+  const tonearmPivot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 0.055, 16),
+    recordMetalMaterial,
+  );
+  tonearmPivot.position.set(0.27, 0.7, 0.13);
+  recordPlayer.add(tonearmPivot);
+
+  // Two simple brass controls on the front panel.
+  [-0.12, 0.12].forEach((x) => {
+    const control = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.032, 0.032, 0.025, 14),
+      recordTrimMaterial,
+    );
+    control.rotation.x = Math.PI / 2;
+    control.position.set(x, 0.39, 0.263);
+    recordPlayer.add(control);
+  });
+
+  recordPlayer.position.set(-2.55, roomFloorY, roomBackZ + 0.55);
+  scene.add(recordPlayer);
+
+  // ===== Three movie posters (left wall → /movies) =====
+  const moviePosters = new THREE.Group();
+  const posterW = 0.5;
+  const posterH = 0.75;
+
+  const createPosterTexture = (index: number) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 360;
+    canvas.height = 540;
+    const ctx = canvas.getContext("2d")!;
+    const W = canvas.width;
+    const H = canvas.height;
+
+    if (index === 0) {
+      const sunset = ctx.createLinearGradient(0, 0, 0, H);
+      sunset.addColorStop(0, "#42306f");
+      sunset.addColorStop(0.48, "#df6f62");
+      sunset.addColorStop(1, "#f4c56d");
+      ctx.fillStyle = sunset;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#ffd783";
       ctx.beginPath();
-      ctx.moveTo(x + r, barY);
-      ctx.lineTo(x + barW - r, barY);
-      ctx.arcTo(x + barW, barY, x + barW, barY + r, r);
-      ctx.lineTo(x + barW, barY + barH - r);
-      ctx.arcTo(x + barW, barY + barH, x + barW - r, barY + barH, r);
-      ctx.lineTo(x + r, barY + barH);
-      ctx.arcTo(x, barY + barH, x, barY + barH - r, r);
-      ctx.lineTo(x, barY + r);
-      ctx.arcTo(x, barY, x + r, barY, r);
-      ctx.closePath();
+      ctx.arc(W * 0.68, H * 0.34, 62, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = "#283c59";
+      ctx.fillRect(0, H * 0.58, W, H * 0.42);
+      ctx.strokeStyle = "rgba(255,225,170,.7)";
+      ctx.lineWidth = 5;
+      [0.64, 0.71, 0.79].forEach((y) => {
+        ctx.beginPath();
+        ctx.moveTo(35, H * y);
+        ctx.quadraticCurveTo(W / 2, H * (y - 0.025), W - 28, H * y);
+        ctx.stroke();
+      });
+    } else if (index === 1) {
+      const space = ctx.createRadialGradient(W * 0.55, H * 0.4, 15, W / 2, H / 2, H);
+      space.addColorStop(0, "#31528a");
+      space.addColorStop(0.55, "#111d42");
+      space.addColorStop(1, "#070913");
+      ctx.fillStyle = space;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#dceaff";
+      for (let i = 0; i < 55; i++) {
+        const x = (i * 83) % W;
+        const y = (i * 137) % (H * 0.72);
+        const r = i % 5 === 0 ? 2.2 : 1.1;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.strokeStyle = "#89b7e8";
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.ellipse(W * 0.5, H * 0.42, 115, 54, -0.35, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#c87f72";
+      ctx.beginPath();
+      ctx.arc(W * 0.5, H * 0.42, 70, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const night = ctx.createLinearGradient(0, 0, 0, H);
+      night.addColorStop(0, "#24142d");
+      night.addColorStop(0.55, "#671f35");
+      night.addColorStop(1, "#120f18");
+      ctx.fillStyle = night;
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#f1c77a";
+      ctx.beginPath();
+      ctx.arc(W * 0.72, H * 0.23, 38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#16141c";
+      const buildings = [110, 175, 135, 205, 150, 188, 120];
+      buildings.forEach((height, i) => {
+        const x = i * 54 - 8;
+        ctx.fillRect(x, H - height, 48, height);
+        ctx.fillStyle = i % 2 ? "#e08a58" : "#d8b166";
+        for (let row = 0; row < 4; row++) {
+          ctx.fillRect(x + 10, H - height + 24 + row * 32, 7, 12);
+          ctx.fillRect(x + 29, H - height + 24 + row * 32, 7, 12);
+        }
+        ctx.fillStyle = "#16141c";
+      });
     }
 
-    tvScreenTexture.needsUpdate = true;
+    const titles = [
+      ["AFTERGLOW", "海边日落"],
+      ["ORBIT", "漫游星轨"],
+      ["MIDNIGHT", "城市雨夜"],
+    ];
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#fff7e8";
+    ctx.font = "700 34px Georgia, serif";
+    ctx.fillText(titles[index][0], W / 2, H - 72);
+    ctx.font = "18px sans-serif";
+    ctx.fillText(titles[index][1], W / 2, H - 40);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    return texture;
   };
-  drawTvScreen(performance.now());
-  // Mount on left wall, high on the wall, roughly centered
-  tv.position.set(-3.16, 1.55, -0.5);
-  tv.rotation.y = Math.PI / 2; // face +X (into room)
-  scene.add(tv);
+
+  for (let i = 0; i < 3; i++) {
+    const poster = new THREE.Group();
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(posterW + 0.045, posterH + 0.045, 0.035),
+      mats.tvBody,
+    );
+    frame.castShadow = true;
+    poster.add(frame);
+
+    const image = new THREE.Mesh(
+      new THREE.PlaneGeometry(posterW, posterH),
+      new THREE.MeshBasicMaterial({
+        map: createPosterTexture(i),
+        toneMapped: false,
+      }),
+    );
+    image.position.z = 0.019;
+    poster.add(image);
+    poster.position.x = (i - 1) * 0.66;
+    poster.position.y = i === 1 ? 0.12 : 0;
+    moviePosters.add(poster);
+  }
+
+  moviePosters.position.set(-3.16, 1.65, -0.5);
+  moviePosters.rotation.y = Math.PI / 2;
+  scene.add(moviePosters);
 
   // ===== Person (seated on chair, feet on floor, facing -Z toward laptop) =====
   // Coordinate system: person group at world y=0 (so floor at local y=-0.5)
@@ -1163,6 +1946,8 @@ export function initDiorama() {
   //   head center local y = 0.85
   //   feet bottom local y = -0.5 (exactly on floor)
   const person = new THREE.Group();
+  const personShirtMaterial = new THREE.MeshToonMaterial({ color: 0xe88aa5 });
+  const personPantsMaterial = new THREE.MeshToonMaterial({ color: 0x17171b });
 
   // ---- Chair ----
   const chairSeat = new THREE.Mesh(
@@ -1196,7 +1981,7 @@ export function initDiorama() {
   // ---- Torso ----
   const torso = new THREE.Mesh(
     new THREE.CylinderGeometry(0.2, 0.27, 0.58, 14),
-    mats.personCloth,
+    personShirtMaterial,
   );
   torso.position.y = 0.32;
   torso.castShadow = true;
@@ -1228,13 +2013,23 @@ export function initDiorama() {
   hair.rotation.x = -0.15;
   person.add(hair);
 
+  // Long hair falls from the back of the head to below the shoulders.
+  const backHair = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.13, 0.36, 8, 16),
+    mats.personHair,
+  );
+  backHair.position.set(0, 0.64, 0.075);
+  backHair.scale.set(1.06, 1, 0.72);
+  backHair.castShadow = true;
+  person.add(backHair);
+
   // ---- Shoulder joints ----
   const shoulderGeo = new THREE.SphereGeometry(0.09, 14, 12);
-  const shoulderL = new THREE.Mesh(shoulderGeo, mats.personCloth);
+  const shoulderL = new THREE.Mesh(shoulderGeo, personShirtMaterial);
   shoulderL.position.set(-0.26, 0.55, 0);
   shoulderL.castShadow = true;
   person.add(shoulderL);
-  const shoulderR = new THREE.Mesh(shoulderGeo, mats.personCloth);
+  const shoulderR = new THREE.Mesh(shoulderGeo, personShirtMaterial);
   shoulderR.position.set(0.26, 0.55, 0);
   shoulderR.castShadow = true;
   person.add(shoulderR);
@@ -1247,13 +2042,23 @@ export function initDiorama() {
     armGroup.rotation.z = -0.06 * side;
 
     const upperLen = 0.42;
-    const upperArm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.075, 0.065, upperLen, 12),
-      mats.personCloth,
+    const sleeveLen = 0.15;
+    const sleeve = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.078, 0.072, sleeveLen, 12),
+      personShirtMaterial,
     );
-    upperArm.position.y = -upperLen / 2;
-    upperArm.castShadow = true;
-    armGroup.add(upperArm);
+    sleeve.position.y = -sleeveLen / 2;
+    sleeve.castShadow = true;
+    armGroup.add(sleeve);
+
+    const bareUpperLen = upperLen - sleeveLen;
+    const bareUpperArm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.064, bareUpperLen, 12),
+      mats.personSkin,
+    );
+    bareUpperArm.position.y = -sleeveLen - bareUpperLen / 2;
+    bareUpperArm.castShadow = true;
+    armGroup.add(bareUpperArm);
 
     const elbowGroup = new THREE.Group();
     elbowGroup.position.y = -upperLen;
@@ -1262,14 +2067,14 @@ export function initDiorama() {
 
     const elbowSphere = new THREE.Mesh(
       new THREE.SphereGeometry(0.068, 12, 10),
-      mats.personCloth,
+      mats.personSkin,
     );
     elbowGroup.add(elbowSphere);
 
     const forearmLen = 0.4;
     const forearm = new THREE.Mesh(
       new THREE.CylinderGeometry(0.065, 0.052, forearmLen, 12),
-      mats.personCloth,
+      mats.personSkin,
     );
     forearm.position.y = -forearmLen / 2;
     forearm.castShadow = true;
@@ -1277,7 +2082,7 @@ export function initDiorama() {
 
     const cuff = new THREE.Mesh(
       new THREE.CylinderGeometry(0.058, 0.058, 0.02, 12),
-      mats.personCloth,
+      mats.personSkin,
     );
     cuff.position.y = -forearmLen - 0.01;
     elbowGroup.add(cuff);
@@ -1313,7 +2118,7 @@ export function initDiorama() {
     // So cylinder axis ends: top at +Z, bottom at -Z. We want thigh to go from hip at z=0 to knee at z=-0.42
     const thigh = new THREE.Mesh(
       new THREE.CylinderGeometry(0.1, 0.09, thighLen, 12),
-      mats.personCloth,
+      personPantsMaterial,
     );
     thigh.rotation.x = Math.PI / 2;
     thigh.position.set(0.12 * side, 0.02, -thighLen / 2);
@@ -1323,7 +2128,7 @@ export function initDiorama() {
     // Knee sphere (at -Z end of thigh)
     const knee = new THREE.Mesh(
       new THREE.SphereGeometry(0.082, 12, 10),
-      mats.personCloth,
+      personPantsMaterial,
     );
     knee.position.set(0.12 * side, 0.02, -thighLen);
     person.add(knee);
@@ -1334,7 +2139,7 @@ export function initDiorama() {
     const shinLen = shinTopY - shinBottomY;
     const shin = new THREE.Mesh(
       new THREE.CylinderGeometry(0.08, 0.06, shinLen, 12),
-      mats.personCloth,
+      personPantsMaterial,
     );
     shin.position.set(0.12 * side, (shinTopY + shinBottomY) / 2, -thighLen);
     shin.castShadow = true;
@@ -1356,7 +2161,7 @@ export function initDiorama() {
   // Pelvis (hide gap between torso and thighs)
   const pelvis = new THREE.Mesh(
     new THREE.BoxGeometry(0.42, 0.14, 0.3),
-    mats.personCloth,
+    personPantsMaterial,
   );
   pelvis.position.set(0, 0.04, 0);
   pelvis.castShadow = true;
@@ -1367,13 +2172,14 @@ export function initDiorama() {
   scene.add(person);
 
   // ===== Interactive registry =====
-  // Lamp + window are decorative only. Notebook → /articles, clicking the person → /about.
+  // Lamp, window and sleeping cat are decorative only.
   const interactives: Interactive[] = [
-    { object: notebook, label: "笔记本 · 文章", route: "/articles", basePos: notebook.position.clone() },
+    { object: deskNotebook, label: "笔记本 · 博文", route: "/articles", basePos: deskNotebook.position.clone() },
     { object: laptop, label: "电脑 · 项目", route: "/projects", basePos: laptop.position.clone() },
     { object: person, label: "xiaolao · 关于", route: "/about", basePos: person.position.clone() },
-    { object: bookStack, label: "书 · 读书", route: "/books", basePos: bookStack.position.clone() },
-    { object: tv, label: "电视 · 观影", route: "/movies", basePos: tv.position.clone() },
+    { object: bookshelf, label: "书架 · 读书", route: "/books", basePos: bookshelf.position.clone() },
+    { object: moviePosters, label: "电影海报 · 观影", route: "/movies", basePos: moviePosters.position.clone() },
+    { object: recordPlayer, label: "唱片机 · 歌单", route: "/music", basePos: recordPlayer.position.clone(), kind: "music" },
   ];
 
   // ===== Theme =====
@@ -1397,15 +2203,29 @@ export function initDiorama() {
     mats.books[1].color.setHex(p.bookB);
     mats.books[2].color.setHex(p.bookC);
     mats.tvBody.color.setHex(p.tvBody);
-    // tvScreen is now a CanvasTexture (equalizer bars) — no emissive to tint.
-    // Point light `tvLight` still gives the wall a warm cast.
     mats.pot.color.setHex(p.pot);
     mats.personSkin.color.setHex(p.personSkin);
     mats.personHair.color.setHex(p.personHair);
     mats.personCloth.color.setHex(p.personCloth);
+    personShirtMaterial.color.setHex(t === "dark" ? 0xb75f7c : 0xe88aa5);
+    personPantsMaterial.color.setHex(t === "dark" ? 0x0c0c10 : 0x17171b);
     mats.key.color.setHex(p.keyTop);
     mats.windowFrame.color.setHex(p.windowFrame);
     mats.windowSill.color.setHex(p.windowSill);
+    seaMaterial.color.setHex(t === "dark" ? 0x214e67 : 0x58aeca);
+    beachMaterial.color.setHex(t === "dark" ? 0x765f45 : 0xe7c58d);
+    islandMaterial.color.setHex(t === "dark" ? 0x263f38 : 0x55765a);
+    foamMaterial.color.setHex(t === "dark" ? 0xa9c7cc : 0xf8fbf6);
+    cupCeramicMaterial.color.setHex(t === "dark" ? 0xb58f72 : 0xf1e4d2);
+    iceMaterial.color.setHex(t === "dark" ? 0x8db6c0 : 0xd9f2f5);
+    iceCubes.visible = t !== "dark";
+    coffeeSteam.visible = t === "dark";
+    steamMaterial.color.setHex(t === "dark" ? 0xb9c5c9 : 0xe8eeee);
+    notebookCoverMaterial.color.setHex(t === "dark" ? 0x29423f : 0x496b67);
+    notebookPageMaterial.color.setHex(t === "dark" ? 0xbdb6a7 : 0xeee7d7);
+    bookshelfWood.color.setHex(t === "dark" ? 0x4f3325 : 0x8b5c3e);
+    recordWoodMaterial.color.setHex(t === "dark" ? 0x452c22 : 0x85563a);
+    recordTrimMaterial.color.setHex(t === "dark" ? 0x80623f : 0xc39358);
   };
   applyTheme(theme);
 
@@ -1677,7 +2497,7 @@ export function initDiorama() {
       hovered = hit;
       canvasEl.style.cursor = hit ? "pointer" : "grab";
       if (tooltip) {
-        if (hit) {
+        if (hit && hit.kind !== "music") {
           tooltip.textContent = hit.label;
           tooltip.classList.add("is-visible");
         } else {
@@ -1685,16 +2505,23 @@ export function initDiorama() {
         }
       }
     }
-    if (tooltip && hit) {
+    if (hit?.kind === "music") {
+      showMusicPlayer(e.clientX, e.clientY);
+    } else {
+      scheduleMusicHide();
+    }
+    if (tooltip && hit && hit.kind !== "music") {
       tooltip.style.transform = `translate(${e.clientX + 14}px, ${e.clientY + 14}px)`;
     }
   };
   canvasEl.addEventListener("pointermove", pointerMove);
-  canvasEl.addEventListener("pointerleave", () => {
+  const pointerLeave = () => {
     hovered = null;
     canvasEl.style.cursor = "grab";
     tooltip?.classList.remove("is-visible");
-  });
+    scheduleMusicHide();
+  };
+  canvasEl.addEventListener("pointerleave", pointerLeave);
   canvasEl.style.cursor = "grab";
 
   let startX = 0;
@@ -1932,9 +2759,6 @@ export function initDiorama() {
       drawScreen();
     }
 
-    // TV equalizer — animated every frame (cheap: 15 rounded rects on 640×360 canvas)
-    drawTvScreen(now);
-
     // Hover bob
     for (const it of interactives) {
       if (it.object === windowHitbox) continue;
@@ -1995,6 +2819,15 @@ export function initDiorama() {
       const v = Math.max(0.001, scale);
       item.mesh.scale.set(item.baseScale.x * v, item.baseScale.y * v, item.baseScale.z * v);
     }
+
+    // Slow breathing keeps the sleeping cat subtly alive.
+    const catBreath = 1 + Math.sin(now * 0.0018) * 0.012;
+    catBody.scale.set(
+      catBodyBaseScale.x,
+      catBodyBaseScale.y * catBreath,
+      catBodyBaseScale.z,
+    );
+    catHead.rotation.z = Math.sin(now * 0.0012) * 0.008;
 
     // Person head/torso idle motion
     head.rotation.x = Math.sin(now * 0.0004) * 0.02 + 0.1;
@@ -2088,6 +2921,42 @@ export function initDiorama() {
       if (cd.mesh.position.x > 5.5) cd.mesh.position.x = -5.5;
       cd.mesh.position.y = cd.baseY + Math.sin(now * 0.0002 + cd.mesh.position.x) * 0.03;
     }
+    for (const wave of beachWaveData) {
+      wave.mesh.position.x =
+        wave.baseX + Math.sin(now * 0.00035 + wave.phase) * 0.09;
+    }
+    spinningRecord.rotation.y += musicIsPlaying ? dtSec * 1.35 : 0;
+    if (musicIsPlaying) {
+      noteSpawnAccum += dtSec;
+      while (noteSpawnAccum > 0.55) {
+        noteSpawnAccum -= 0.55;
+        if (floatingNotes.length < 10) spawnFloatingNote();
+      }
+    } else {
+      noteSpawnAccum = 0;
+    }
+    for (let i = floatingNotes.length - 1; i >= 0; i--) {
+      const note = floatingNotes[i]!;
+      note.age += dtSec;
+      const t = note.age / note.life;
+      note.mesh.position.y += note.rise * dtSec;
+      note.mesh.position.x += note.driftX * dtSec;
+      note.mesh.position.z += note.driftZ * dtSec;
+      note.mesh.material.rotation += note.spin * dtSec;
+      const fade =
+        t < 0.15 ? t / 0.15 : t > 0.7 ? Math.max(0, 1 - (t - 0.7) / 0.3) : 1;
+      note.mesh.material.opacity = fade * (musicIsPlaying ? 0.9 : 0.35);
+      note.mesh.material.color.setHex(theme === "dark" ? 0xf3e6d8 : 0x2b211c);
+      if (t >= 1) {
+        scene.remove(note.mesh);
+        note.mesh.material.dispose();
+        floatingNotes.splice(i, 1);
+      }
+    }
+    if (coffeeSteam.visible) {
+      coffeeSteam.position.y = Math.sin(now * 0.0012) * 0.008;
+      coffeeSteam.rotation.y = Math.sin(now * 0.00055) * 0.08;
+    }
 
     for (let s = 0; s < 4; s++) {
       const key = SEASON_KEYS[s];
@@ -2156,8 +3025,23 @@ export function initDiorama() {
     canvasEl.removeEventListener("touchmove", touchMove);
     canvasEl.removeEventListener("touchend", touchEnd);
     canvasEl.removeEventListener("pointermove", pointerMove);
+    canvasEl.removeEventListener("pointerleave", pointerLeave);
     canvasEl.removeEventListener("pointerdown", pointerDownHandler);
     canvasEl.removeEventListener("pointerup", pointerUpHandler);
+    cancelMusicHide();
+    unsubscribeMusicPlayer();
+    musicPlayer?.removeEventListener("mouseenter", musicMouseEnter);
+    musicPlayer?.removeEventListener("mouseleave", musicMouseLeave);
+    musicToggle?.removeEventListener("click", musicToggleHandler);
+    musicPrevious?.removeEventListener("click", musicPreviousHandler);
+    musicNext?.removeEventListener("click", musicNextHandler);
+    musicPlayer?.classList.remove("is-visible");
+    for (const note of floatingNotes) {
+      scene.remove(note.mesh);
+      note.mesh.material.dispose();
+    }
+    floatingNotes.length = 0;
+    for (const texture of noteTextures) texture.dispose();
     themeObserver.disconnect();
     resizeObs.disconnect();
     controls.dispose();

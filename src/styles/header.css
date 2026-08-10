@@ -1030,3 +1030,90 @@
     font-size: 0.74rem;
   }
 }
+
+/* Mac-style header now-playing bar */
+.header-music-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  color: rgb(55 65 81);
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.header-music-bar__btn:hover {
+  background: rgb(0 0 0 / 0.06);
+  color: rgb(17 24 39);
+}
+
+.header-music-bar__btn:active {
+  transform: scale(0.94);
+}
+
+[data-theme="dark"] .header-music-bar__btn {
+  color: rgb(209 213 219);
+}
+
+[data-theme="dark"] .header-music-bar__btn:hover {
+  background: rgb(255 255 255 / 0.08);
+  color: white;
+}
+
+.header-music-bar__lyric {
+  display: block;
+  max-width: min(34vw, 16rem);
+  height: 1.35rem;
+  line-height: 1.35rem;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+.header-music-bar__lyric-text {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgb(55 65 81);
+  animation: header-lyric-in 0.35s ease;
+}
+
+[data-theme="dark"] .header-music-bar__lyric-text {
+  color: rgb(229 231 235);
+}
+
+.header-music-bar__lyric:hover .header-music-bar__lyric-text {
+  color: var(--color-primary-600, #2563eb);
+}
+
+[data-theme="dark"] .header-music-bar__lyric:hover .header-music-bar__lyric-text {
+  color: var(--color-primary-300, #93c5fd);
+}
+
+@keyframes header-lyric-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .header-music-bar {
+    max-width: min(48vw, 11rem);
+  }
+
+  .header-music-bar__lyric {
+    max-width: min(32vw, 7.5rem);
+  }
+}

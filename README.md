@@ -136,6 +136,55 @@ pm2 restart xiaolao-blog
 HOST=127.0.0.1 PORT=4321 node ./dist/server/entry.mjs
 ```
 
+### 可选：接入自建 QQ 音乐 API
+
+站点已内置 QQ 音乐歌单「博客歌单」（ID `9751662138`，分享链接
+`https://c6.y.qq.com/base/fcgi-bin/u?__=hhgTVWOMHBEh`）。封面与曲目元数据可直接从
+QQ 拉取；站内试听需要自建 [Meting-API](https://github.com/mikus-loli/Meting-API)
+并配置 VIP Cookie（歌单内多为付费曲目）：
+
+```bash
+git clone https://github.com/mikus-loli/Meting-API.git /opt/meting-api
+cd /opt/meting-api
+npm install
+pm2 start node.js --name qq-music-api
+pm2 save
+```
+
+确认接口能返回歌单：
+
+```bash
+curl "http://127.0.0.1:2500/api?server=tencent&type=playlist&id=9751662138"
+```
+
+然后把 API 地址和歌单 ID 写入博客进程环境变量：
+
+```bash
+cd /var/www/xiaolao-blog
+QQ_MUSIC_API_BASE=http://127.0.0.1:2500 \
+QQ_MUSIC_PLAYLIST_ID=9751662138 \
+pm2 restart xiaolao-blog --update-env
+pm2 save
+```
+
+### QQ 音乐「昨天能播今天不行」
+
+常见原因：**播放直链会过期**（通常几小时），或 Meting-API 里的
+**VIP Cookie 失效**。站点已改为点击播放时通过 `/api/music/url` 现取新链接。
+
+若仍失败，在服务器检查：
+
+```bash
+# Meting-API 是否在跑
+pm2 status
+curl "http://127.0.0.1:2500/api?server=tencent&type=url&id=0013FZ2a2kpRO2"
+
+# 博客环境变量是否还在
+pm2 show xiaolao-blog | grep -i QQ_MUSIC
+```
+
+若 `type=url` 返回空：打开 Meting 后台，重新粘贴 QQ Cookie 并验证 VIP。
+
 ### 可选：OSS 静态托管
 
 若仅部署纯静态内容，构建产物中的静态文件位于 `dist/client/`，可用 `ossutil` 上传：

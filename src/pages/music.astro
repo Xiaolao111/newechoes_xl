@@ -1,0 +1,19 @@
+---
+import Layout from "@/components/Layout.astro";
+import MusicPlaylist from "@/components/MusicPlaylist";
+---
+
+<Layout title="歌单" description="我正在听的音乐">
+  <header class="mb-8">
+    <p class="mb-2 font-mono text-xs tracking-[0.24em] text-amber-700 dark:text-amber-300">
+      MUSIC ROOM
+    </p>
+    <h1 class="text-3xl font-bold">博客歌单</h1>
+    <p class="mt-2 text-gray-500 dark:text-gray-400">
+      来自 QQ 音乐，从首页唱片机进入，也可以在这里浏览和控制歌曲。
+    </p>
+  </header>
+
+  <MusicPlaylist client:load />
+</Layout>
+

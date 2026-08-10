@@ -32,9 +32,52 @@ const autoPostsLabel = `${postCount} 篇 · 近 ${years} 年`;
     <a href="/about" data-astro-prefetch="hover">关于</a>
     <a href="/books" data-astro-prefetch="hover">读书</a>
     <a href="/movies" data-astro-prefetch="hover">观影</a>
+    <a href="/music" data-astro-prefetch="hover">歌单</a>
   </div>
 
   <div class="diorama-tooltip" data-diorama-tooltip aria-hidden="true"></div>
+
+  <section
+    class="diorama-music-player"
+    data-diorama-music-player
+    aria-label="音乐播放器"
+    aria-hidden="true"
+  >
+    <a class="diorama-music-player__cover-link" href="/music" aria-label="打开完整歌单">
+      <img data-music-cover alt="" />
+    </a>
+    <div class="diorama-music-player__body">
+      <span class="diorama-music-player__eyebrow">NOW PLAYING</span>
+      <a class="diorama-music-player__title" data-music-title href="/music"></a>
+      <span class="diorama-music-player__artist" data-music-artist></span>
+      <span class="diorama-music-player__error" data-music-error></span>
+      <div class="diorama-music-player__controls">
+        <button type="button" data-music-previous aria-label="上一首">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 5v14M18 6l-9 6 9 6V6z"></path>
+          </svg>
+        </button>
+        <button
+          class="diorama-music-player__play"
+          type="button"
+          data-music-toggle
+          aria-label="播放"
+        >
+          <svg data-music-play-icon viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 5v14l11-7L8 5z"></path>
+          </svg>
+          <svg data-music-pause-icon viewBox="0 0 24 24" aria-hidden="true" hidden>
+            <path d="M7 5h4v14H7zM13 5h4v14h-4z"></path>
+          </svg>
+        </button>
+        <button type="button" data-music-next aria-label="下一首">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M18 5v14M6 6l9 6-9 6V6z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script is:inline define:vars={{ autoPostsLabel }}>

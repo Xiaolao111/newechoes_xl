@@ -17,7 +17,8 @@ export const NAV_STRUCTURE = [
         text: '生活',
         items: [
             { id: 'movies', text: '观影', href: '/movies' },
-            { id: 'books', text: '读书', href: '/books' }
+            { id: 'books', text: '读书', href: '/books' },
+            { id: 'music', text: '歌单', href: '/music' }
         ]
     },
     { id: 'albums', text: '足迹', href: '/albums' },

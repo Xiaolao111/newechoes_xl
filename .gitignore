@@ -47,3 +47,6 @@ ossutil_output/
 .helloagents/plan/
 .helloagents/archive/
 .helloagents/CHANGELOG.md
+
+# private ops notes (server IPs, cookies, tokens)
+private/
