@@ -15,7 +15,9 @@ import { customSitemapIntegration } from "./src/plugins/sitemap-integration.js";
 import { rssIntegration } from "./src/plugins/rss-integration.js";
 import { robotsIntegration } from "./src/plugins/robots-integration.js";
 import mermaid from 'astro-mermaid';
-import { rehypeKatex } from "./src/plugins/rehype-katex.js";
+import rehypeKatex from "rehype-katex";
+import remarkMath from "remark-math";
+import { remarkNormalizeMath } from "./src/plugins/remark-normalize-math.js";
 import { remarkImageCaptions } from "./src/plugins/remark-image-captions.js";
 
 
@@ -65,7 +67,7 @@ export default defineConfig({
 
   // Markdown 配置 - 使用官方语法高亮
   markdown: {
-    remarkPlugins: [remarkImageCaptions],
+    remarkPlugins: [remarkNormalizeMath, remarkMath, remarkImageCaptions],
     // 配置语法高亮
     syntaxHighlight: {
       // 使用shiki作为高亮器
@@ -85,9 +87,9 @@ export default defineConfig({
     },
     rehypePlugins: [
       [rehypeExternalLinks, { target: '_blank', rel: ['nofollow', 'noopener', 'noreferrer'] }],
+      [rehypeKatex, { strict: "ignore", throwOnError: false }],
       rehypeCodeBlocks,
       rehypeTables,
-      rehypeKatex
     ],
     gfm: true,
   },

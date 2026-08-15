@@ -97,6 +97,31 @@ npm run new-post
 npm run build
 ```
 
+### 一键部署（推荐）
+
+在项目根目录执行（本机构建 → rsync `dist` → 服务器生成搜索索引 → `pm2 restart`）：
+
+```bash
+npm run deploy
+```
+
+等价于：
+
+```bash
+./scripts/deploy.sh
+```
+
+可选环境变量：
+
+```bash
+DEPLOY_HOST=root@<服务器公网IP> \
+REMOTE_DIR=/var/www/xiaolao-blog \
+PM2_APP=xiaolao-blog \
+npm run deploy
+```
+
+默认 `DEPLOY_HOST` 为当前阿里云实例。
+
 ### 同步 dist 到服务器
 
 ```bash

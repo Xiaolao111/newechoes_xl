@@ -1,5 +1,6 @@
 @import "./articles-table.css";
 @import "./articles-code.css";
+@import "./articles-math.css";
 
 /* 增强列表样式 */
 .prose ul {

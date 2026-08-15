@@ -1,0 +1,68 @@
+/* KaTeX 默认 1.21em，在中文正文中会显得偏大 */
+.prose .katex {
+  font-size: 1em;
+}
+
+.prose .katex-display {
+  margin: 1.25em 0;
+}
+
+/*
+ * KaTeX 0.16 HTML（.vbox/.thinbox/.inner/.fix）与 0.18 CSS（.katex-*）类名不一致。
+ * 缺 .thinbox { width:0 } 时 \neq 会显示成 "/ ="。
+ */
+.katex .vbox {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: baseline;
+}
+
+.katex .thinbox {
+  display: inline-flex;
+  flex-direction: row;
+  width: 0;
+  max-width: 0;
+}
+
+.katex .llap,
+.katex .rlap,
+.katex .clap {
+  width: 0;
+  position: relative;
+}
+
+.katex .llap > .inner,
+.katex .rlap > .inner,
+.katex .clap > .inner,
+.katex .llap > .katex-inner,
+.katex .rlap > .katex-inner,
+.katex .clap > .katex-inner {
+  position: absolute;
+}
+
+.katex .llap > .fix,
+.katex .rlap > .fix,
+.katex .clap > .fix,
+.katex .llap > .katex-fix,
+.katex .rlap > .katex-fix,
+.katex .clap > .katex-fix {
+  display: inline-block;
+}
+
+.katex .llap > .inner,
+.katex .llap > .katex-inner {
+  right: 0;
+}
+
+.katex .rlap > .inner,
+.katex .clap > .inner,
+.katex .rlap > .katex-inner,
+.katex .clap > .katex-inner {
+  left: 0;
+}
+
+.katex .clap > .inner > span,
+.katex .clap > .katex-inner > span {
+  margin-left: -50%;
+  margin-right: 50%;
+}

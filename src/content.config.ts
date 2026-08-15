@@ -126,8 +126,8 @@ async function getContentStructure(): Promise<ContentStructure> {
 
 // 4. 定义你的集合
 const articles = defineCollection({
-  loader: glob({ 
-    pattern: "**/*.{md,mdx}", 
+  loader: glob({
+    pattern: "**/*.{md,mdx}",
     base: "./src/content"
   }),
   schema: z.object({

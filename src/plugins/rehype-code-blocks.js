@@ -27,6 +27,15 @@ export function rehypeCodeBlocks() {
         const language = languageClass
           ? languageClass.split('-')[1].toUpperCase()
           : (shikiLanguage ? shikiLanguage.toUpperCase() : 'TEXT');
+
+        // 公式块由 rehype-katex 渲染，不再包一层代码块 UI
+        if (
+          classNames.includes('language-math') ||
+          classNames.includes('math-display') ||
+          classNames.includes('math-inline')
+        ) {
+          return;
+        }
           
         // 提取原始代码 - 改进提取逻辑，处理Shiki高亮的代码
         let codeContent = '';

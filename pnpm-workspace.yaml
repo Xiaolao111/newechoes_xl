@@ -1,3 +1,9 @@
+allowBuilds:
+  esbuild: set this to true or false
+  sharp: set this to true or false
+  swup: set this to true or false
+overrides:
+  katex: 0.18.4
 ignoredBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild

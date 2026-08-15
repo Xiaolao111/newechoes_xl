@@ -1,8 +1,9 @@
 # build output
 dist/
 
-# generated types
+# generated types and Astro content cache
 .astro/
+**/.astro/
 
 # local build and test caches
 .vite/
@@ -11,9 +12,13 @@ coverage/
 playwright-report/
 test-results/
 *.tsbuildinfo
+.turbo/
+vite.config.*.timestamp-*
 
 # dependencies
 node_modules/
+.pnpm-store/
+.npm/
 
 # logs
 *.log
@@ -29,9 +34,17 @@ pnpm-debug.log*
 
 # macOS-specific files
 .DS_Store
+._*
+
+# Windows-specific files
+Thumbs.db
+Desktop.ini
 
 # jetbrains setting folder
 .idea/
+
+# editor / agent local state
+.cursor/
 
 # wasm
 wasm/**/target/
