@@ -1,11 +1,7 @@
 {
-  "version": 2,
-  "buildCommand": "pnpm build",
-  "installCommand": "pnpm install",
-  "framework": "astro",
-  "outputDirectory": "dist",
-  "public": false,
+  "framework": null,
+  "buildCommand": "echo 'unused — Google Photos API is on Cloudflare Pages'",
   "github": {
     "silent": true
   }
-} 
+}

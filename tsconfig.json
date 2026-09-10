@@ -1,6 +1,6 @@
 {
   "extends": "astro/tsconfigs/strict",
-  "include": ["src/**/*", "scripts/new-post.mjs"],
+  "include": ["src/**/*", "api/**/*", "scripts/new-post.mjs"],
   "exclude": ["dist", "helloagents"],
   "compilerOptions": {
     "baseUrl": ".",

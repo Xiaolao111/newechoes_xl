@@ -1,24 +1,7 @@
 ---
 import Layout from "@/components/Layout.astro";
 import WorldHeatmap from "@/components/WorldHeatmap";
-
-const VISITED_PLACES = [
-  "中国-黑龙江",
-  "中国-吉林",
-  "中国-辽宁",
-  "中国-北京",
-  "中国-河北",
-  "中国-山东",
-  "中国-江苏",
-  "中国-安徽",
-  "中国-广东",
-  "中国-福建",
-  "中国-重庆",
-  "中国-江西",
-  "中国-浙江",
-  "中国-上海",
-  "韩国",
-];
+import { TRAVEL_ALBUMS, VISITED_PLACES, getTravelAlbumPath } from "@/consts";
 ---
 
 <Layout
@@ -26,9 +9,36 @@ const VISITED_PLACES = [
   description="我去过的地方"
 >
   <section class="container mx-auto px-4 py-8">
-    <h1 class="mb-6 text-center text-3xl font-semibold">我的旅行足迹</h1>
+    <h1 class="mb-2 text-center text-3xl font-semibold">我的旅行足迹</h1>
+    <p class="mb-6 text-center text-sm text-gray-500 dark:text-gray-400">
+    </p>
     <div class="mx-auto rounded-xl bg-white p-6 shadow-lg hover:shadow-xl dark:bg-gray-800">
-      <WorldHeatmap client:only="react" visitedPlaces={VISITED_PLACES} />
+      <WorldHeatmap
+        client:only="react"
+        visitedPlaces={VISITED_PLACES}
+        albumBasePath="/albums"
+      />
     </div>
+
+    <ul class="mx-auto mt-8 flex max-w-4xl flex-wrap justify-center gap-2">
+      {
+        TRAVEL_ALBUMS.map((album) => (
+          <li>
+            <a
+              href={getTravelAlbumPath(album.place)}
+              class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/70"
+              data-astro-prefetch="hover"
+            >
+              {album.place.replace(/^中国-/, "")}
+              {
+                album.shareUrl ? (
+                  <span class="ml-1.5 text-xs text-emerald-600 dark:text-emerald-400">相册</span>
+                ) : null
+              }
+            </a>
+          </li>
+        ))
+      }
+    </ul>
   </section>
 </Layout>

@@ -53,6 +53,9 @@ wasm/**/pkg/
 # vercel
 .vercel/
 
+# cloudflare wrangler
+.wrangler/
+
 # local OSS CLI reports
 ossutil_output/
 
@@ -63,3 +66,4 @@ ossutil_output/
 
 # private ops notes (server IPs, cookies, tokens)
 private/
+.vercel

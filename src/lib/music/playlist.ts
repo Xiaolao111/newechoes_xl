@@ -36,7 +36,7 @@ const songPage = (songmid: string) =>
 export const PLACEHOLDER_PLAYLIST: MusicPlaylist = {
   id: QQ_MUSIC_PLAYLIST_ID,
   title: "博客歌单",
-  description: "来自 QQ 音乐 · 点击歌曲可打开 QQ 音乐页面",
+  description: "",
   sourceUrl: QQ_MUSIC_SHARE_URL,
   tracks: [
     {

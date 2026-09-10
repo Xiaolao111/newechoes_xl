@@ -1,0 +1,48 @@
+---
+import Layout from "@/components/Layout.astro";
+import PhotoAlbumMasonry from "@/components/PhotoAlbumMasonry";
+import { getTravelAlbum, VISITED_PLACES } from "@/consts";
+
+const placeParam = Astro.params.place ?? "";
+const place = decodeURIComponent(placeParam);
+const album = getTravelAlbum(place);
+const displayName = place.replace(/^中国-/, "");
+
+if (!album || !VISITED_PLACES.includes(place)) {
+  return Astro.redirect("/albums");
+}
+---
+
+<Layout
+  title={`${displayName} · 旅行相册`}
+  description={`${displayName}的旅行照片`}
+>
+  <section class="container mx-auto px-4 py-8">
+    <p class="mb-4 text-sm">
+      <a
+        href="/albums"
+        class="text-emerald-700 hover:underline dark:text-emerald-300"
+        data-astro-prefetch="hover"
+      >
+        ← 返回足迹地图
+      </a>
+    </p>
+    <h1 class="mb-6 text-center text-3xl font-semibold">{displayName}</h1>
+
+    {
+      album.shareUrl ? (
+        <PhotoAlbumMasonry
+          client:load
+          shareUrl={album.shareUrl}
+          title={album.title ?? `${displayName}相册`}
+        />
+      ) : (
+        <div class="mx-auto max-w-xl rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+          <p class="mb-2 font-medium">这个地方还没有相册</p>
+          <p class="text-sm leading-6">
+          </p>
+        </div>
+      )
+    }
+  </section>
+</Layout>

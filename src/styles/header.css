@@ -1,4 +1,11 @@
-/* 自定义Header组件样式 */
+/* 站点标题：衬线体 g / y 的字脚不要被 bg-clip-text 裁掉 */
+.site-logo {
+  line-height: 1.35;
+  padding-bottom: 0.18em;
+  overflow: visible;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 
 /* 滚动效果 */
 #header-bg.scrolled {

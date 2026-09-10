@@ -117,7 +117,7 @@ const normalizeExternalPlaylist = (
   return {
     id: playlistId,
     title: String(nested?.name ?? nested?.title ?? "我的 QQ 音乐歌单"),
-    description: "数据来自自建 QQ Music API",
+    description: "",
     sourceUrl: `https://y.qq.com/n/ryqq/playlist/${playlistId}`,
     tracks,
   };
@@ -193,7 +193,7 @@ const fetchOfficialPlaylist = async (
   return {
     id: playlistId,
     title: cd?.dissname || "博客歌单",
-    description: "来自 QQ 音乐 · 配置自建 API 后可站内播放",
+    description: "",
     sourceUrl: `https://y.qq.com/n/ryqq/playlist/${playlistId}`,
     tracks,
   };

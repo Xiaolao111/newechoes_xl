@@ -210,6 +210,36 @@ pm2 show xiaolao-blog | grep -i QQ_MUSIC
 
 若 `type=url` 返回空：打开 Meting 后台，重新粘贴 QQ Cookie 并验证 VIP。
 
+### 可选：把 Google 相册接口放到 Cloudflare Pages
+
+足迹相册要拉 `photos.google.com`，阿里云国内访问会失败。站点本身仍部署在阿里云，只把
+`/api/google-photos` 放到 Cloudflare Pages（能访问 Google）。不要用 Vercel：阿里云访问不了
+`*.vercel.app`。
+
+本机在仓库根目录登录并部署：
+
+```bash
+npx wrangler login
+npx wrangler pages deploy cf-photos-public --project-name=xiaolao-photos
+```
+
+记下输出的 `*.pages.dev` 域名。在阿里云上确认能通：
+
+```bash
+curl "https://xiaolao-photos.pages.dev/api/google-photos?shareUrl=https://photos.app.goo.gl/U5qrc3r3ghs7q2un8"
+```
+
+然后给博客进程换上这个地址（不要再指向 vercel.app）：
+
+```bash
+cd /var/www/xiaolao-blog
+GOOGLE_PHOTOS_API_BASE=https://xiaolao-photos.pages.dev \
+pm2 restart xiaolao-blog --update-env
+pm2 save
+```
+
+浏览器仍请求 `https://xiaolao.ink/api/google-photos`。本地 `npm run dev` 不设这个变量时，会走本机代理直连 Google。
+
 ### 可选：OSS 静态托管
 
 若仅部署纯静态内容，构建产物中的静态文件位于 `dist/client/`，可用 `ossutil` 上传：

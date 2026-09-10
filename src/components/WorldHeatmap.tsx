@@ -41,10 +41,20 @@ interface GeoWasmModule {
 
 interface WorldHeatmapProps {
   visitedPlaces: string[];
+  /** 点击已去过的地点时跳转的相册路径前缀，例如 /albums */
+  albumBasePath?: string;
 }
 
-const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
+const WorldHeatmap: React.FC<WorldHeatmapProps> = ({
+  visitedPlaces,
+  albumBasePath,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const visitedPlacesRef = useRef(visitedPlaces);
+  const albumBasePathRef = useRef(albumBasePath);
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  visitedPlacesRef.current = visitedPlaces;
+  albumBasePathRef.current = albumBasePath;
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">(
     typeof document !== "undefined" &&
@@ -778,12 +788,22 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
               setHoveredCountry(result.countryName);
             }
 
+            if (containerRef.current) {
+              const canOpenAlbum =
+                Boolean(albumBasePathRef.current) &&
+                visitedPlacesRef.current.includes(result.countryName);
+              containerRef.current.style.cursor = canOpenAlbum ? "pointer" : "grab";
+            }
+
             // 不禁用自动旋转，保持地球旋转
           } else {
             // 如果没有找到国家/地区，清除悬停状态
             updateHighlight(null);
             if (hoveredCountry) {
               setHoveredCountry(null);
+            }
+            if (containerRef.current) {
+              containerRef.current.style.cursor = "grab";
             }
           }
 
@@ -807,11 +827,41 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
           controls.autoRotate = true;
         };
 
+        const navigateToAlbum = (place: string) => {
+          const base = albumBasePathRef.current;
+          if (!base) {
+            return;
+          }
+
+          const url = `${base.replace(/\/$/, "")}/${encodeURIComponent(place)}`;
+          const swup = (
+            window as Window & {
+              swup?: { navigate?: (nextRoute: string) => void };
+            }
+          ).swup;
+
+          if (swup?.navigate) {
+            swup.navigate(url);
+          } else {
+            window.location.assign(url);
+          }
+        };
+
+        const onPointerDown = (event: PointerEvent) => {
+          pointerDownRef.current = { x: event.clientX, y: event.clientY };
+        };
+
         // 简化的鼠标点击事件处理函数
         const onClick = (event: MouseEvent) => {
           if (!containerRef.current || !sceneRef.current || !geoProcessor) {
             return;
           }
+
+          const pointerDown = pointerDownRef.current;
+          const dragged =
+            pointerDown &&
+            Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y) > 8;
+          pointerDownRef.current = null;
 
           // 获取鼠标在球面上的点
           const result = getPointOnSphere(
@@ -828,6 +878,13 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
             // 更新选中国家
             setHoveredCountry(result.countryName);
             sceneRef.current.lastClickedCountry = result.countryName;
+
+            if (
+              !dragged &&
+              visitedPlacesRef.current.includes(result.countryName)
+            ) {
+              navigateToAlbum(result.countryName);
+            }
             // 不禁用自动旋转，保持地球始终旋转
           } else {
             // 如果没有找到国家/地区，清除选择
@@ -848,6 +905,9 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
         };
 
         // 添加事件监听器
+        containerRef.current.addEventListener("pointerdown", onPointerDown, {
+          passive: true,
+        });
         containerRef.current.addEventListener("mousemove", onMouseMove, {
           passive: true,
         });
@@ -861,6 +921,7 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
         // 保存清理函数
         cleanupFunctions.push(() => {
           if (containerRef.current) {
+            containerRef.current.removeEventListener("pointerdown", onPointerDown);
             containerRef.current.removeEventListener("mousemove", onMouseMove);
             containerRef.current.removeEventListener("click", onClick);
             containerRef.current.removeEventListener("dblclick", onDoubleClick);
@@ -1174,7 +1235,7 @@ const WorldHeatmap: React.FC<WorldHeatmapProps> = ({ visitedPlaces }) => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  已去过
+                  {albumBasePath ? "已去过 · 点击查看相册" : "已去过"}
                 </span>
               ) : (
                 <span className="inline-flex items-center justify-center bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-400 px-2.5 py-1 rounded-full text-sm ml-1.5 whitespace-nowrap">

@@ -43,6 +43,48 @@ export const PHOTO_ALBUM_CONFIG = {
     title: '生活碎片'
 };
 
+/** Cloudflare Pages 上的相册 Worker，浏览器从这里加载缩略图，避免直连 Google。 */
+export const GOOGLE_PHOTOS_WORKER_ORIGIN = "https://xiaolao-photos.pages.dev";
+
+/**
+ * 旅行足迹相册：每个国家 / 中国省份对应一个 Google Photos「链接分享」相册。
+ * 在 Google 相册里按地点建相册 → 分享 → 获取链接 → 填到 shareUrl。
+ * 没填 shareUrl 时，地图仍可点进去，页面会提示还没有照片。
+ */
+export type TravelAlbum = {
+    place: string;
+    shareUrl?: string;
+    title?: string;
+};
+
+export const TRAVEL_ALBUMS: TravelAlbum[] = [
+    { place: "中国-黑龙江" },
+    { place: "中国-吉林" },
+    { place: "中国-辽宁" },
+    { place: "中国-北京" },
+    { place: "中国-河北" },
+    { place: "中国-山东" },
+    { place: "中国-江苏", shareUrl: "https://photos.app.goo.gl/U5qrc3r3ghs7q2un8" },
+    { place: "中国-安徽" },
+    { place: "中国-广东" },
+    { place: "中国-福建" },
+    { place: "中国-重庆" },
+    { place: "中国-江西" },
+    { place: "中国-浙江" },
+    { place: "中国-上海", shareUrl: "https://photos.app.goo.gl/zhC4JsPhftJDsaBw5" },
+    { place: "韩国" },
+];
+
+export const VISITED_PLACES = TRAVEL_ALBUMS.map((album) => album.place);
+
+export function getTravelAlbum(place: string) {
+    return TRAVEL_ALBUMS.find((album) => album.place === place) ?? null;
+}
+
+export function getTravelAlbumPath(place: string) {
+    return `/albums/${encodeURIComponent(place)}`;
+}
+
 // 主页 diorama —— 笔记本屏幕上显示的个人信息
 // 所有字段都可以改。rows 可加可减；typewriter 列表里的每一条都会被轮播打字-删除。
 export const HOME_PROFILE = {

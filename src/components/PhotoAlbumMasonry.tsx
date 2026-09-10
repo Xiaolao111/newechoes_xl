@@ -44,7 +44,7 @@ interface ScrollLockState {
 }
 
 const REVEAL_BATCH_SIZE = 15;
-const CLIENT_TIMEOUT_MS = 12000;
+const CLIENT_TIMEOUT_MS = 28000;
 
 const breakpointColumns = {
   default: 5,

@@ -1,6 +1,6 @@
-import vm from "node:vm";
-
 const RPC_ID = "snAcKc";
+
+type NodeFetch = (input: URL | string, init?: RequestInit) => Promise<Response>;
 
 export type GooglePhotoItem = {
   index: number;
@@ -47,22 +47,59 @@ type GlobalData = {
   cfb2h: string;
 };
 
-const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_TIMEOUT_MS = 25000;
 
 const imageUrl = (baseUrl: string, params: string) => `${baseUrl}=${params}`;
+
+function bytesToBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(value: string) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
 
 async function fetchWithTimeout(url: URL | string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const targetUrl = new URL(url);
+  const customFetch = (globalThis as { __googlePhotosNodeFetch?: NodeFetch }).__googlePhotosNodeFetch;
 
   try {
-    return await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
+    const response = customFetch
+      ? await customFetch(targetUrl, {
+          ...options,
+          signal: controller.signal,
+        })
+      : await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+
+    const redirectStatus = response.status;
+    const location = response.headers.get("location");
+    if (location && [301, 302, 303, 307, 308].includes(redirectStatus)) {
+      return fetchWithTimeout(new URL(location, targetUrl), {
+        ...options,
+        method: redirectStatus === 303 ? "GET" : options.method,
+        body: redirectStatus === 303 ? undefined : options.body,
+      });
+    }
+
+    return response;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Google Photos 请求超时");
+      throw new Error("Google Photos 请求超时，请确认本机代理可访问 Google");
     }
 
     throw error;
@@ -72,10 +109,10 @@ async function fetchWithTimeout(url: URL | string, options: RequestInit = {}) {
 }
 
 const encodeCursor = (cursor: CursorPayload) =>
-  Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+  bytesToBase64Url(new TextEncoder().encode(JSON.stringify(cursor)));
 
 const decodeCursor = (cursor: string): CursorPayload =>
-  JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  JSON.parse(new TextDecoder().decode(base64UrlToBytes(cursor)));
 
 const toPhotoItems = (items: unknown[][], startIndex = 0): GooglePhotoItem[] => {
   return items
@@ -144,27 +181,157 @@ export async function fetchSharedAlbumHtml(shareUrl: string) {
   };
 }
 
-export function parseInitData(html: string): InitData {
-  const callbacks: Record<string, { data: unknown[] }> = {};
-  const context = {
-    AF_initDataCallback(data: { key: string; data: unknown[] }) {
-      callbacks[data.key] = data;
-    },
-  };
-  vm.createContext(context);
-
-  const callbackScriptPattern =
-    /<script class="(ds:\d+)"[^>]*>(AF_initDataCallback\([\s\S]*?\);)<\/script>/g;
-
-  let match;
-  while ((match = callbackScriptPattern.exec(html))) {
-    vm.runInContext(match[2], context, {
-      timeout: 1000,
-      displayErrors: false,
-    });
+function extractBalanced(source: string, start: number) {
+  const open = source[start];
+  const close = open === "{" ? "}" : open === "[" ? "]" : null;
+  if (!close) {
+    return null;
   }
 
-  const albumData = Object.values(callbacks).find(({ data }) => {
+  let depth = 0;
+  let inString: '"' | "'" | null = null;
+  let escaped = false;
+
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === inString) {
+        inString = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = char;
+      continue;
+    }
+
+    if (char === open) {
+      depth += 1;
+    } else if (char === close) {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function findTopLevelProperty(objectLiteral: string, name: string) {
+  const needle = `${name}:`;
+  let inString: '"' | "'" | null = null;
+  let escaped = false;
+  let depth = 0;
+
+  for (let index = 0; index < objectLiteral.length; index += 1) {
+    const char = objectLiteral[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (char === inString) {
+        inString = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      inString = char;
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      depth -= 1;
+      continue;
+    }
+
+    if (depth === 1 && objectLiteral.startsWith(needle, index)) {
+      const before = objectLiteral[index - 1];
+      if (!before || /[\s,{]/.test(before)) {
+        return index + needle.length;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function skipWhitespace(source: string, start: number) {
+  let index = start;
+  while (index < source.length && /\s/.test(source[index] ?? "")) {
+    index += 1;
+  }
+  return index;
+}
+
+function parseJsLiteral(source: string) {
+  return JSON.parse(source.replace(/\bundefined\b/g, "null").replace(/,\s*([\]}])/g, "$1"));
+}
+
+export function parseInitData(html: string): InitData {
+  const callbacks: { data: unknown[] }[] = [];
+  const callbackPattern = /AF_initDataCallback\(/g;
+
+  let match;
+  while ((match = callbackPattern.exec(html))) {
+    const objectStart = skipWhitespace(html, match.index + match[0].length);
+    if (html[objectStart] !== "{") {
+      continue;
+    }
+
+    const objectLiteral = extractBalanced(html, objectStart);
+    if (!objectLiteral) {
+      continue;
+    }
+
+    const dataOffset = findTopLevelProperty(objectLiteral, "data");
+    if (dataOffset < 0) {
+      continue;
+    }
+
+    const dataStart = skipWhitespace(objectLiteral, dataOffset);
+    if (objectLiteral[dataStart] !== "[") {
+      continue;
+    }
+
+    const dataLiteral = extractBalanced(objectLiteral, dataStart);
+    if (!dataLiteral) {
+      continue;
+    }
+
+    try {
+      const data = parseJsLiteral(dataLiteral);
+      if (Array.isArray(data)) {
+        callbacks.push({ data });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  const albumData = callbacks.find(({ data }) => {
     return Array.isArray(data?.[1]) && Array.isArray(data?.[3]);
   });
 
@@ -176,13 +343,17 @@ export function parseInitData(html: string): InitData {
 }
 
 export function parseGlobalData(html: string): GlobalData {
-  const match = html.match(/window\.WIZ_global_data = (\{.*?\});<\/script>/s);
+  const fSid = html.match(/"FdrFJe"\s*:\s*"((?:\\.|[^"\\])*)"/)?.[1];
+  const bl = html.match(/"cfb2h"\s*:\s*"((?:\\.|[^"\\])*)"/)?.[1];
 
-  if (!match) {
+  if (!fSid || !bl) {
     throw new Error("Could not find Google Photos global data in page payload");
   }
 
-  return JSON.parse(match[1]) as GlobalData;
+  return {
+    FdrFJe: JSON.parse(`"${fSid}"`),
+    cfb2h: JSON.parse(`"${bl}"`),
+  };
 }
 
 export function parseBatchExecuteResponse(text: string) {
@@ -287,7 +458,12 @@ export async function fetchGooglePhotosPage({
     throw new Error("Could not find Google Photos album id");
   }
 
-  const shareKey = new URL(resolvedUrl).searchParams.get("key");
+  let shareKey: string | null = null;
+  try {
+    shareKey = resolvedUrl ? new URL(resolvedUrl, shareUrl).searchParams.get("key") : null;
+  } catch {
+    shareKey = null;
+  }
   const nextToken = initData[2] || "";
 
   return {
