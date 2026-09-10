@@ -1,6 +1,6 @@
 // 1. 从 `astro:content` 导入工具函数
 import { defineCollection, z, getCollection, type CollectionEntry } from 'astro:content';
-import { glob } from 'astro/loaders';
+import { normalizedGlob } from './plugins/normalized-glob-loader.js';
 
 // 2. 定义内容结构接口
 export interface ContentStructure {
@@ -126,7 +126,7 @@ async function getContentStructure(): Promise<ContentStructure> {
 
 // 4. 定义你的集合
 const articles = defineCollection({
-  loader: glob({
+  loader: normalizedGlob({
     pattern: "**/*.{md,mdx}",
     base: "./src/content"
   }),

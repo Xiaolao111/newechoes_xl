@@ -25,7 +25,7 @@ export function remarkNormalizeMath() {
  * @returns {string}
  */
 export function normalizeDisplayMath(source) {
-  const preprocessed = preprocessMathLines(source);
+  const preprocessed = preprocessMathLines(preprocessBlockquoteMath(source));
   let out = "";
   let i = 0;
 
@@ -47,6 +47,60 @@ export function normalizeDisplayMath(source) {
 }
 
 /**
+ * Pull display math out of blockquote lines (`> $$`) so remark-math can see `$$`.
+ * @param {string} source
+ */
+function preprocessBlockquoteMath(source) {
+  const lines = source.split("\n");
+  const out = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (/^>\s*\$\$/.test(line)) {
+      const open = line.match(/^>\s*\$\$\s*(.*)$/);
+      const trailing = open?.[1]?.trim() ?? "";
+
+      if (trailing && trailing.endsWith("$$")) {
+        out.push("$$", trailing.slice(0, -2).trim(), "$$", "");
+        i += 1;
+        continue;
+      }
+
+      out.push("$$");
+      if (trailing) out.push(trailing);
+      i += 1;
+
+      while (i < lines.length) {
+        const current = lines[i];
+
+        if (/^>\s*\$\$\s*.*$/.test(current)) {
+          const close = current.match(/^>\s*\$\$\s*(.*)$/);
+          const rest = close?.[1]?.trim() ?? "";
+          out.push(rest, "$$", "");
+          i += 1;
+          break;
+        }
+
+        if (/^>\s?/.test(current)) {
+          out.push(current.replace(/^>\s?/, ""));
+        } else {
+          out.push(current);
+        }
+        i += 1;
+      }
+      continue;
+    }
+
+    out.push(line);
+    i += 1;
+  }
+
+  return out.join("\n");
+}
+
+/**
  * Fix Obsidian-style patterns that break remark-math without touching LaTeX itself.
  * @param {string} source
  */
@@ -54,6 +108,11 @@ function preprocessMathLines(source) {
   return source
     .split("\n")
     .map((line) => {
+      const singleLineListMath = line.match(/^(\d+\.\s*)\$\$(.+)\$\$\s*$/);
+      if (singleLineListMath) {
+        return `${singleLineListMath[1]}\n\n$$\n${singleLineListMath[2].trim()}\n$$`;
+      }
+
       const listMath = line.match(/^(\d+\.\s*)\$\$(.*)$/);
       if (listMath) {
         const rest = listMath[2].trim();

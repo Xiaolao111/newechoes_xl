@@ -83,12 +83,12 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
   </div>
   <nav class="relative">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
+      <div class="flex h-16 items-center justify-between gap-2">
         <!-- Logo + 迷你播放条 -->
-        <div class="flex min-w-0 items-center">
+        <div class="flex min-w-0 flex-1 items-center overflow-hidden">
           <a
             href="/"
-            class="shrink-0 text-xl md:text-2xl font-bold tracking-tight bg-linear-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent hover:from-primary-500 hover:to-primary-300 dark:from-primary-400 dark:to-primary-200 dark:hover:from-primary-300 dark:hover:to-primary-100"
+            class="shrink-0 text-lg sm:text-xl md:text-2xl font-bold tracking-tight bg-linear-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent hover:from-primary-500 hover:to-primary-300 dark:from-primary-400 dark:to-primary-200 dark:hover:from-primary-300 dark:hover:to-primary-100"
           >
             {SITE_TITLE}
           </a>
@@ -104,9 +104,9 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
         </div>
 
         <!-- 导航链接 - 集成NavSelector组件 -->
-        <div class="hidden md:flex md:items-center md:space-x-4">
+        <div class="hidden md:flex md:shrink-0 md:items-center md:space-x-4">
           <!-- 集成的NavSelector代码 -->
-          <nav class="nav-selector relative mr-4" data-duration="300" data-has-active={hasActiveNavItem.toString()}>
+          <nav class="nav-selector relative mr-4 shrink-0" data-duration="300" data-has-active={hasActiveNavItem.toString()}>
             <!-- 高亮背景元素 -->
             <div id="nav-primary-highlight" 
                 class="absolute z-0 bg-primary-100 dark:bg-primary-800/30 rounded-xl shadow-md backdrop-blur-sm transition-all duration-300"></div>
@@ -117,14 +117,14 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
                 class="absolute z-5 bg-primary-100/50 dark:bg-primary-800/20 rounded-xl shadow-sm backdrop-blur-sm transition-all duration-200 opacity-0"></div>
             
             <!-- 导航菜单项 -->
-            <div class="flex items-center relative z-20 space-x-8">
+            <div class="flex shrink-0 items-center relative z-20 space-x-8">
               {navItems.map((item) => (
                 <>
                   {!item.items ? (
                     <!-- 单项导航 -->
                     <a 
                       href={item.href} 
-                      class="nav-item relative flex items-center justify-center h-10 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+                      class="nav-item relative flex shrink-0 items-center justify-center h-10 px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
                       data-item-id={item.id}
                       data-state={activeItem && activeItem.id === item.id ? "active" : "inactive"}
                       data-astro-prefetch="hover"
@@ -139,7 +139,7 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
                       <!-- 一级菜单按钮 -->
                       <button 
                         type="button"
-                        class="nav-group-toggle relative flex items-center justify-center h-10 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+                        class="nav-group-toggle relative flex shrink-0 items-center justify-center h-10 px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
                         data-toggle-id={item.id}
                         data-state={activeGroupId === item.id ? "active" : "inactive"}
                         data-height-reference="true"
@@ -153,7 +153,7 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
                           {item.items.map((subItem) => (
                             <a 
                               href={subItem.href} 
-                              class="nav-subitem relative flex items-center justify-center h-10 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
+                              class="nav-subitem relative flex shrink-0 items-center justify-center h-10 px-4 py-2 text-sm font-medium whitespace-nowrap text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400"
                               data-subitem-id={`${item.id}-${subItem.id}`}
                               data-parent-id={item.id}
                               data-state={activeSubItem && activeSubItem.id === subItem.id ? "active" : "inactive"}
@@ -205,7 +205,7 @@ const hasActiveNavItem = activeItem || activeGroupId || activeSubItem ? true : f
         </div>
 
         <!-- 移动端按钮区域 -->
-        <div class="flex items-center md:hidden space-x-1">
+        <div class="relative z-10 flex shrink-0 items-center md:hidden space-x-1">
           <button
             type="button"
             class={`${iconButtonClass} focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500`}

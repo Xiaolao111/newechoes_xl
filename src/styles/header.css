@@ -96,9 +96,16 @@
   position: absolute;
 }
 
-/* 导航项的文字颜色过渡 */
+/* 导航项的文字颜色过渡；中文两字标签禁止被挤成上下排列 */
 .nav-item, .nav-subitem, .nav-group-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
+  word-break: keep-all;
   transition: color 0.3s ease, font-weight 0.15s ease;
+}
+
+.nav-selector .flex.items-center {
+  flex-shrink: 0;
 }
 
 /* 汉堡菜单动画样式 */
@@ -1108,12 +1115,20 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .header-music-bar {
-    max-width: min(48vw, 11rem);
+    max-width: 2.25rem;
+    margin-left: 0.5rem;
   }
 
+  .header-music-bar__btn--skip,
   .header-music-bar__lyric {
-    max-width: min(32vw, 7.5rem);
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .header-music-bar {
+    display: none;
   }
 }

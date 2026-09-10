@@ -72,7 +72,7 @@ const HeaderMusicBar: React.FC = () => {
 
   return (
     <div
-      className="header-music-bar ml-3 flex min-w-0 max-w-[min(42vw,22rem)] items-center"
+      className="header-music-bar ml-2 flex min-w-0 max-w-[min(42vw,22rem)] items-center overflow-hidden sm:ml-3"
       data-playing={isPlaying ? "true" : "false"}
       title={error ?? undefined}
     >
@@ -100,7 +100,7 @@ const HeaderMusicBar: React.FC = () => {
           </a>
           <button
             type="button"
-            className="header-music-bar__btn shrink-0"
+            className="header-music-bar__btn header-music-bar__btn--skip shrink-0"
             onClick={() => void next()}
             aria-label="下一首"
           >
@@ -111,7 +111,7 @@ const HeaderMusicBar: React.FC = () => {
         <div className="header-music-bar__controls flex items-center gap-0.5">
           <button
             type="button"
-            className="header-music-bar__btn"
+            className="header-music-bar__btn header-music-bar__btn--skip"
             onClick={() => void previous()}
             aria-label="上一首"
           >
@@ -127,7 +127,7 @@ const HeaderMusicBar: React.FC = () => {
           </button>
           <button
             type="button"
-            className="header-music-bar__btn"
+            className="header-music-bar__btn header-music-bar__btn--skip"
             onClick={() => void next()}
             aria-label="下一首"
           >

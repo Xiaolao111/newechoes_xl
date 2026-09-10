@@ -10,6 +10,7 @@
     "new-post": "node src/plugins/new-post.mjs",
     "deploy": "bash scripts/deploy.sh",
     "publish:gaoshu": "bash scripts/publish-gaoshu.sh",
+    "publish:kaoyan": "bash scripts/publish-gaoshu.sh",
     "test": "node --test"
   },
   "dependencies": {
